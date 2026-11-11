@@ -5,7 +5,15 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
-from dayboard.core.models import ProviderKey, Snapshot
+from dayboard.core.models import ErrorCode, ProviderKey, Snapshot
+
+
+class ProviderUnavailable(Exception):
+    def __init__(self, code: ErrorCode) -> None:
+        if not isinstance(code, ErrorCode):
+            raise ValueError("A safe provider error code is required.")
+        super().__init__(code.value)
+        self.code = code
 
 
 class Capability(StrEnum):

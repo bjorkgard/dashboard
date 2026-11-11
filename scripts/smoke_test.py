@@ -16,6 +16,9 @@ async def smoke(expected_version: str) -> None:
         raise RuntimeError("Installed distribution has the wrong version.")
     if not files("dayboard").joinpath("ui/styles/shell.tcss").is_file():
         raise RuntimeError("Installed distribution is missing its stylesheet.")
+    for name in ("CalendarBridge.swift", "Info.plist"):
+        if not files("dayboard").joinpath("native", name).is_file():
+            raise RuntimeError("Installed distribution is missing native calendar sources.")
     app = DayboardApp(demo=True)
     async with app.run_test(size=(120, 36)) as pilot:
         await pilot.pause()

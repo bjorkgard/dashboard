@@ -7,7 +7,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from dayboard.core.models import ErrorCode, ProviderKey, Snapshot
-from dayboard.core.providers import ProviderRegistry, RateLimited
+from dayboard.core.providers import ProviderRegistry, ProviderUnavailable, RateLimited
 from dayboard.core.store import SnapshotStore
 
 
@@ -19,6 +19,7 @@ class Scheduler:
         *,
         clock: Callable[[], float] = time.monotonic,
         jitter: Callable[[], float] = random.random,
+        on_change: Callable[[], None] | None = None,
     ) -> None:
         self.registry = registry
         self.store = store
@@ -29,6 +30,7 @@ class Scheduler:
         self._due: dict[ProviderKey, float] = {}
         self._failures: dict[ProviderKey, int] = {}
         self._closed = False
+        self._on_change = on_change
 
     @property
     def running_count(self) -> int:
@@ -71,6 +73,8 @@ class Scheduler:
                     self.store.publish(result)
             except TimeoutError:
                 error = ErrorCode.TIMEOUT
+            except ProviderUnavailable as unavailable:
+                error = unavailable.code
             except RateLimited as limited:
                 error = ErrorCode.RATE_LIMITED
                 retry_after = limited.retry_after
@@ -88,6 +92,8 @@ class Scheduler:
                 self._failures[key] = 0
             delay = max(retry_after, interval * (1 + 0.1 * max(0, min(1, self._jitter()))))
             self._due[key] = self._clock() + delay
+        if self._on_change is not None:
+            self._on_change()
         return True
 
     async def close(self) -> None:

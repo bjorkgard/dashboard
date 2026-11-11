@@ -1,4 +1,4 @@
-"""Milestone-one shell. Real integrations and full navigation are intentionally absent."""
+"""Local-first overview with explicitly enabled calendar, weather and GitHub sources."""
 
 from datetime import datetime
 from importlib.metadata import version
@@ -9,11 +9,13 @@ from textual.widgets import Footer, Static
 
 from dayboard.config import Config, ConfigStore
 from dayboard.core.models import ProviderKey
-from dayboard.core.providers import Capability, ProviderRegistry
+from dayboard.core.providers import Capability
 from dayboard.core.scheduler import Scheduler
 from dayboard.core.store import SnapshotStore
+from dayboard.integrations.runtime import build_live_registry
 from dayboard.paths import AppPaths
 from dayboard.ui.card import SnapshotCard
+from dayboard.ui.telemetry import TelemetryCard
 from dayboard.ui.welcome import WelcomeScreen
 
 PANELS: tuple[tuple[str, str, Capability], ...] = (
@@ -35,16 +37,19 @@ class DayboardApp(App[None]):
         super().__init__()
         self.demo = demo
         # Demo deliberately does not resolve, load, create, or save real application state.
-        self.config_store = None if demo else ConfigStore(paths or AppPaths.default())
-        self.config = Config() if demo else (self.config_store.load() or Config())  # type: ignore[union-attr]
+        self.config_store: ConfigStore | None = None
+        self.config = Config()
         if demo:
             from dayboard.demo import demo_registry
 
             self.registry = demo_registry()
         else:
-            self.registry = ProviderRegistry()
+            paths = paths or AppPaths.default()
+            self.config_store = ConfigStore(paths)
+            self.config = self.config_store.load() or Config()
+            self.registry = build_live_registry(self.config, paths)
         self.store = SnapshotStore()
-        self.scheduler = Scheduler(self.registry, self.store)
+        self.scheduler = Scheduler(self.registry, self.store, on_change=self._refresh_view)
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="masthead"):
@@ -53,7 +58,7 @@ class DayboardApp(App[None]):
         yield Static(
             "DEMO · SYNTHETIC DATA · No accounts, network, or state access"
             if self.demo
-            else "LOCAL WORKSPACE · No services connected",
+            else f"LOCAL WORKSPACE · {len(self.registry.all())} enabled sources",
             id="mode",
             markup=False,
         )
@@ -68,15 +73,19 @@ class DayboardApp(App[None]):
             )
             with Grid(id="cards"):
                 for panel, name, _ in PANELS:
-                    yield SnapshotCard(panel, name)
+                    if panel == "mac" and not self.demo:
+                        yield TelemetryCard(panel, name)
+                    else:
+                        yield SnapshotCard(panel, name)
             yield Static(
-                "APPLE NEWS  /  Feed connection and clickable ticker arrive in milestone 4.",
+                "APPLE NEWS  /  Feed connection and clickable ticker remain on the roadmap.",
                 id="news-notice",
                 markup=False,
             )
             yield Static(
-                "Milestone 1 · Secure foundations only. Tabs, flip-clock animation and provider "
-                "setup are not implemented yet.",
+                "Local CPU/RAM/network are live. Calendar/weather/GitHub are opt-in. "
+                "Full tabs, mail and "
+                "flip-clock animation remain on the roadmap.",
                 id="scope",
                 markup=False,
             )
@@ -104,10 +113,29 @@ class DayboardApp(App[None]):
         base.query_one("#clock", Static).update(
             now.strftime("%H:%M:%S") + "\n" + now.strftime("%A, %B %d  ·  %Z")
         )
-        if self.demo:
-            for panel, _, _ in PANELS:
+        for panel, _, capability in PANELS:
+            card = base.query_one(f"#card-{panel}", SnapshotCard)
+            if self.demo:
                 snapshot = self.store.status(ProviderKey(f"demo-{panel}")).snapshot
-                base.query_one(f"#card-{panel}", SnapshotCard).show_snapshot(snapshot)
+                card.show_snapshot(snapshot)
+                continue
+            provider = next(
+                (p for p in self.registry.all() if capability in p.spec.capabilities),
+                None,
+            )
+            if provider is not None:
+                status = self.store.status(
+                    provider.spec.key, stale_after=provider.spec.interval_seconds * 2
+                )
+                if isinstance(card, TelemetryCard):
+                    card.show_telemetry(status, self.store.history(provider.spec.key))
+                else:
+                    card.show_snapshot(
+                        status.snapshot,
+                        state=status.state.value,
+                        error=status.error,
+                        loading=status.attempted_at is None,
+                    )
 
     async def action_quit(self) -> None:
         await self.scheduler.close()

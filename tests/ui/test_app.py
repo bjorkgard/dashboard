@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from textual.widgets import Static
+from textual.widgets import Button, Static
 
 from dayboard.app import DayboardApp
 from dayboard.config import Config, ConfigError, ConfigStore
@@ -18,6 +18,16 @@ def paths(tmp_path):
 
 def text(widget):
     return str(widget.render())
+
+
+async def test_first_run_actions_fit_in_small_terminal(paths):
+    app = DayboardApp(paths=paths)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        viewport = app.screen.query_one("#welcome-scroll").content_region
+        assert app.screen.query_one("#continue", Button).region.bottom <= viewport.bottom
+        assert app.screen.query_one("#quit", Button).region.bottom <= viewport.bottom
+        await pilot.press("q")
 
 
 async def test_header_version_comes_from_installed_package_metadata(paths, monkeypatch):
@@ -123,8 +133,8 @@ async def test_continue_without_accounts_saves_only_nonsecret_preferences(paths)
         await pilot.pause()
         assert not isinstance(app.screen, WelcomeScreen)
         assert ConfigStore(paths).load() == Config(onboarding_complete=True)
-        assert not app.registry.all()
-        assert "Not connected" in text(app.query_one("#card-mac", Static))
+        assert [provider.spec.key.provider for provider in app.registry.all()] == ["mac-telemetry"]
+        assert "CPU" in text(app.query_one("#card-mac", Static))
         assert "DEMO" not in text(app.query_one("#mode", Static))
         await pilot.press("q")
 
@@ -151,6 +161,6 @@ async def test_shell_renders_and_exits_at_common_terminal_sizes(paths, size):
     async with app.run_test(size=size) as pilot:
         await pilot.pause()
         assert app.query_one("#clock", Static).region.width > 0
-        assert not app.registry.all()
+        assert [provider.spec.key.provider for provider in app.registry.all()] == ["mac-telemetry"]
         await pilot.press("q")
     assert app.scheduler.running_count == 0

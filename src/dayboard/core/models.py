@@ -26,6 +26,12 @@ class ConnectionState(StrEnum):
 
 
 class ErrorCode(StrEnum):
+    GITHUB_SETUP_REQUIRED = (
+        "GitHub unavailable; install gh, run gh auth login, and check repository access"
+    )
+    PERMISSION_REQUIRED = "calendar permission required; run dayboard calendar authorize"
+    PERMISSION_DENIED = "calendar access denied; review macOS Calendar privacy permissions"
+    UNAVAILABLE = "provider unavailable; run setup or check native helper"
     TIMEOUT = "collection timed out"
     RATE_LIMITED = "rate limited"
     COLLECTION_FAILED = "collection failed"
