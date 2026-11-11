@@ -13,15 +13,16 @@ GitHub.com open-PR and recent-default-branch commit status.
 Advanced hardware sensors and the other account integrations remain planned.
 Demo values are synthetic, not readings from your Mac or accounts.
 
-**Unreleased development work:** an in-dashboard Settings screen now provides city
+**New in v0.3.0:** an in-dashboard Settings screen provides city
 lookup, Calendar authorization and GitHub editing, with live application of saved
-preferences. This is not included in the published v0.2.0 wheel yet.
+preferences. The existing v0.2.0 integrations remain supported.
 
 ## What works today
 
 - A terminal workspace with a ticking local clock and foundation-preview cards.
 - An isolated `--demo` mode with changing synthetic readings.
 - First-run onboarding that can save an unconnected workspace or quit without saving.
+- In-dashboard Settings with city lookup and live Save/Cancel configuration.
 - Strict, versioned configuration with owner-only permissions and atomic writes.
 - A macOS Keychain credential wrapper with no plaintext fallback.
 - Provider contracts, independent asynchronous collection, timeouts, retry backoff,
@@ -101,9 +102,9 @@ Continue without accounts / Quit without saving labels.) Only explicitly configu
 sources become live; normal mode never substitutes synthetic data. Basic local telemetry
 is available automatically.
 
-### In-dashboard Settings (unreleased)
+### In-dashboard Settings
 
-From this source checkout, press **s** or click **Settings [s]** on the overview.
+In v0.3.0 or newer, press **s** or click **Settings [s]** on the overview.
 The first-run **Configure** action opens the same screen.
 
 - **Weather:** type a city/postal code, press Search or Enter, then explicitly select
@@ -287,7 +288,7 @@ do not downgrade against newly saved preferences without restoring an older back
 
 ### Remaining development roadmap
 
-1. Finish full workspace tabs/detail views; in-app Settings is available in development.
+1. Finish full workspace tabs/detail views; in-app Settings is included from v0.3.0.
 2. Expand calendar providers with ICS/CalDAV and Google/Microsoft authorization.
 3. Add Apple Reminders/Mail, Google Tasks/Gmail, Microsoft To Do/mail, and IMAP.
 4. Expand baseline Mac metrics with disk/battery/process views, then capability-checked
@@ -338,11 +339,11 @@ From the directory containing all three downloads:
 
 ```zsh
 shasum -a 256 -c SHA256SUMS
-uv tool install --python 3.13 ./dayboard-0.2.0-py3-none-any.whl
+uv tool install --python 3.13 ./dayboard-0.3.0-py3-none-any.whl
 dayboard --demo
 ```
 
-The filename above illustrates v0.2.0; use the filename attached to
+The filename above illustrates v0.3.0; use the filename attached to
 your selected release. To install a newer downloaded wheel over an existing
 installation, add `--reinstall`. If `dayboard` is not found, run
 `uv tool update-shell` and open a new terminal. Checksums detect corrupted downloads;
@@ -360,7 +361,7 @@ Application directories use mode `0700`; state files use `0600`. Unsafe symlinks
 hard links, nonregular state files, oversized files, and unsupported configuration
 schemas are rejected. A corrupt configuration is not silently reset or overwritten.
 
-The v0.1.0 foundation did not collect private account data. In v0.2.0,
+The v0.1.0 foundation did not collect private account data. Since v0.2.0,
 enabled Calendar reads upcoming events only after explicit permission; it never
 persists event contents. Keychain behavior is unit-tested with synthetic adapters;
 diagnostics only check backend availability. Demo mode does not read or write

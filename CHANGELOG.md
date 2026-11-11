@@ -6,6 +6,10 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.3.0] - 2026-11-11
+
 ### Added
 
 - In-dashboard integration Settings, opened with `s` or the visible Settings button,
@@ -23,6 +27,13 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 - Cancellation cleans up owned native/CLI descendant processes as well as their parent,
   preventing a compiler child holding stdout from extending the cancellation deadline.
+
+### Compatibility and scope
+
+- Configuration schema remains 3; existing v0.2.0 preferences and Calendar filters are
+  preserved. Saving changed sources resets their in-memory readings and warm-up baselines.
+- This release adds in-app configuration, not new account providers or full workspace tabs.
+  Real Calendar authorization remains explicit and dependent on the user's macOS host grant.
 
 ## [0.2.0] - 2026-11-11
 
