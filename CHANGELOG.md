@@ -6,6 +6,10 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.2.0] - 2026-11-11
+
 ### Added
 
 - Opt-in GitHub.com status for one to five selected repositories: open PR totals and
@@ -24,9 +28,15 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
   actionable permission errors; disabled providers and demo mode never collect live data.
 - Strict configuration schema 3 with in-memory migration from schemas 0, 1 and 2.
 
+### Compatibility
+
+- Configuration schema 3 migrates schemas 0/1/2 in memory and rewrites only on explicit
+  saves. Older v0.1.0 binaries cannot read schema-3 preferences; restore an older
+  preference backup before downgrading.
+
 ### Scope
 
-- These integrations are development changes after the published v0.1.0 release.
+- This release adds the first live integrations after the v0.1.0 foundation.
   Account-authorized Calendar end-to-end verification still requires the user's consent.
   Full Settings/tabs, direct cloud calendar OAuth, daily weather forecasts and persistent
   offline-weather cache restoration remain future work.

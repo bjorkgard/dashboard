@@ -7,10 +7,9 @@ Dayboard is built with Python and [Textual](https://textual.textualize.io/).
 The long-term dashboard will combine calendars, reminders, email, Mac telemetry,
 weather, a flip clock, GitHub activity, AI usage, and a clickable Apple-news ticker.
 
-**Published v0.1.0 delivers the secure foundations.** The development branch adds
-initial opt-in macOS Calendar and Open-Meteo weather modules; these are not released yet.
-The development branch also includes basic CPU, memory and network telemetry.
-It now includes opt-in GitHub.com open-PR and recent-default-branch commit status.
+**Dayboard v0.2.0 adds the first live integrations:** opt-in macOS Calendar and
+Open-Meteo weather, automatic CPU/memory/network telemetry, and selected-repository
+GitHub.com open-PR and recent-default-branch commit status.
 Advanced hardware sensors and the other account integrations remain planned.
 Demo values are synthetic, not readings from your Mac or accounts.
 
@@ -24,9 +23,9 @@ Demo values are synthetic, not readings from your Mac or accounts.
 - Provider contracts, independent asynchronous collection, timeouts, retry backoff,
   last-good snapshots, and bounded history/public-cache infrastructure.
 - Redacted `doctor` diagnostics that do not read credentials.
-- In development: read-only macOS Calendar events and location-configured live weather.
-- In development: automatic local CPU/RAM/network readings and short live histories.
-- In development: selected-repository GitHub PR previews, draft/review/check states,
+- Read-only macOS Calendar events and location-configured live weather.
+- Automatic local CPU/RAM/network readings and short live histories.
+- Selected-repository GitHub PR previews, draft/review/check states,
   and recent default-branch commits, using GitHub CLI's existing authentication.
 - Unit, headless UI, and real pseudo-terminal startup/shutdown tests.
 
@@ -96,7 +95,7 @@ On first launch, choose **Continue without accounts** to save onboarding prefere
 or **Quit without saving**. Only explicitly configured sources become live; normal
 mode never substitutes synthetic data. Basic local telemetry is available automatically.
 
-### CPU, memory and network monitoring (development branch)
+### CPU, memory and network monitoring
 
 Run `uv run --locked dayboard` for the live **Mac pulse** card. No sudo, Swift helper,
 cloud account, or extra macOS permission is required. Sampling runs about once per
@@ -122,7 +121,7 @@ Dayboard does not inspect IP/MAC addresses, connections, packet contents, or pro
 and does not issue network probes. Telemetry history stays in memory and is not uploaded.
 Demo mode never constructs the real telemetry provider.
 
-### GitHub PRs and recent commits (development branch)
+### GitHub PRs and recent commits
 
 Install [GitHub CLI](https://cli.github.com/) and sign in explicitly if you have not
 already done so:
@@ -181,10 +180,10 @@ Disable collection without changing GitHub CLI's credentials:
 uv run --locked dayboard github disable
 ```
 
-### Calendar and weather setup (development branch)
+### Calendar and weather setup
 
-These commands are not in the published v0.1.0 wheel yet. Run them from this source
-checkout after `uv sync --locked --extra dev`.
+These commands require v0.2.0 or newer. The examples below use a source checkout;
+with an installed release, replace `uv run --locked dayboard` with `dayboard`.
 
 For weather, choose your own coordinates and IANA timezone. This example uses
 Stockholm as an explicit example location, not an automatically detected position:
@@ -246,7 +245,7 @@ do not downgrade against newly saved preferences without restoring an older back
 
 ### Remaining development roadmap
 
-1. Finish this calendar/weather slice, then add in-app settings and full tabs.
+1. Add in-app settings and full tabs for the initial live integration modules.
 2. Expand calendar providers with ICS/CalDAV and Google/Microsoft authorization.
 3. Add Apple Reminders/Mail, Google Tasks/Gmail, Microsoft To Do/mail, and IMAP.
 4. Expand baseline Mac metrics with disk/battery/process views, then capability-checked
@@ -297,11 +296,11 @@ From the directory containing all three downloads:
 
 ```zsh
 shasum -a 256 -c SHA256SUMS
-uv tool install --python 3.13 ./dayboard-0.1.0-py3-none-any.whl
+uv tool install --python 3.13 ./dayboard-0.2.0-py3-none-any.whl
 dayboard --demo
 ```
 
-The filename above illustrates the initial version; use the filename attached to
+The filename above illustrates v0.2.0; use the filename attached to
 your selected release. To install a newer downloaded wheel over an existing
 installation, add `--reinstall`. If `dayboard` is not found, run
 `uv tool update-shell` and open a new terminal. Checksums detect corrupted downloads;
@@ -319,7 +318,7 @@ Application directories use mode `0700`; state files use `0600`. Unsafe symlinks
 hard links, nonregular state files, oversized files, and unsupported configuration
 schemas are rejected. A corrupt configuration is not silently reset or overwritten.
 
-The published foundation does not collect private account data. In development,
+The v0.1.0 foundation did not collect private account data. In v0.2.0,
 enabled Calendar reads upcoming events only after explicit permission; it never
 persists event contents. Keychain behavior is unit-tested with synthetic adapters;
 diagnostics only check backend availability. Demo mode does not read or write
