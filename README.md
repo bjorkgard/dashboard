@@ -7,8 +7,11 @@ Dayboard is built with Python and [Textual](https://textual.textualize.io/).
 The long-term dashboard will combine calendars, reminders, email, Mac telemetry,
 weather, a flip clock, GitHub activity, AI usage, and a clickable Apple-news ticker.
 
-**Current status: milestone 1 — secure foundations.** The application runs, but
-live account integrations and machine telemetry are **not implemented yet**.
+**Published v0.1.0 delivers the secure foundations.** The development branch adds
+initial opt-in macOS Calendar and Open-Meteo weather modules; these are not released yet.
+The development branch also includes basic CPU, memory and network telemetry.
+It now includes opt-in GitHub.com open-PR and recent-default-branch commit status.
+Advanced hardware sensors and the other account integrations remain planned.
 Demo values are synthetic, not readings from your Mac or accounts.
 
 ## What works today
@@ -21,12 +24,17 @@ Demo values are synthetic, not readings from your Mac or accounts.
 - Provider contracts, independent asynchronous collection, timeouts, retry backoff,
   last-good snapshots, and bounded history/public-cache infrastructure.
 - Redacted `doctor` diagnostics that do not read credentials.
+- In development: read-only macOS Calendar events and location-configured live weather.
+- In development: automatic local CPU/RAM/network readings and short live histories.
+- In development: selected-repository GitHub PR previews, draft/review/check states,
+  and recent default-branch commits, using GitHub CLI's existing authentication.
 - Unit, headless UI, and real pseudo-terminal startup/shutdown tests.
 
-Account selection/login, full tabs, the animated flip clock, live CPU/GPU/temperature
-graphs, calendar/mail/task providers, GitHub connections, AI-provider analytics,
-weather, and the [aapl.io](https://aapl.io) news ticker are planned work.
-There are no accounts to connect in this version.
+Account selection/login, full tabs, the animated flip clock, GPU/temperature
+graphs, direct Google/Microsoft calendar connections, mail/task providers, GitHub
+issues/notifications/personal review queues, AI-provider analytics, and the [aapl.io](https://aapl.io) news ticker
+are planned work. Calendars already synced with macOS use the OS's existing accounts
+after explicit permission; new cloud-account login is not implemented in this slice.
 
 ## Run locally on a Mac
 
@@ -38,10 +46,10 @@ There are no accounts to connect in this version.
   or newer**.
 - Python **3.13 or newer**. The commands below install Python 3.13 through uv.
 
-The foundation does not require Xcode, a Swift build, administrator access, API
-keys, or Calendar/Mail permissions. Git may prompt you to install Apple's Command
-Line Tools if it is not already available. Native integrations will have their own
-requirements when they are implemented.
+Demo mode and weather do not require Xcode, administrator access, API keys, or
+Calendar/Mail permissions. The native Calendar module requires macOS 14+ and Swift
+Command Line Tools, plus explicit Calendar permission. Git may prompt you to install
+Apple's Command Line Tools if it is not already available.
 
 ### 1. Install uv
 
@@ -64,8 +72,11 @@ uv sync --locked --python 3.13
 ```
 
 Dependencies are installed in the project's `.venv`. You do not need to activate
-it or install Python packages globally. The initial install needs internet access;
-the current application itself makes no provider/network requests.
+it or install Python packages globally. The initial install needs internet access.
+Normal mode reads local CPU/RAM/network counters without making network requests.
+After weather setup, normal mode also contacts Open-Meteo; disabled account/weather
+sources and demo mode make no provider requests. Enabled GitHub status makes a
+bounded read query through GitHub CLI about once per minute.
 
 ### 3. Start Dayboard
 
@@ -82,8 +93,169 @@ uv run --locked dayboard
 ```
 
 On first launch, choose **Continue without accounts** to save onboarding preferences,
-or **Quit without saving**. Normal mode shows unconnected cards; it never substitutes
-synthetic data.
+or **Quit without saving**. Only explicitly configured sources become live; normal
+mode never substitutes synthetic data. Basic local telemetry is available automatically.
+
+### CPU, memory and network monitoring (development branch)
+
+Run `uv run --locked dayboard` for the live **Mac pulse** card. No sudo, Swift helper,
+cloud account, or extra macOS permission is required. Sampling runs about once per
+second on a worker thread and stops when the dashboard exits.
+
+- **CPU:** aggregate utilization from cumulative CPU-time deltas, normalized to 0–100%.
+- **RAM:** total minus OS-available memory, with available/total amounts. Available memory
+  includes memory the OS can reclaim; this is not the same as macOS memory-pressure status.
+- **Network:** upload/download bytes per second, derived from per-interface counter
+  changes and monotonic elapsed time. Units use powers of 1024: KiB/s, MiB/s, etc.
+- **Graphs:** short, bounded recent-sample histories. CPU/RAM graphs use a fixed
+  100% scale; upload/download graphs adapt to their recent peak. Dots represent unknown
+  samples, not zero usage.
+
+The first CPU/network sample establishes a baseline. Counter resets, interface changes,
+and gaps longer than ten seconds reset that baseline rather than producing spikes.
+Unavailable groups remain unknown without hiding other working groups.
+
+Network totals include all active non-loopback interfaces, not only the default route.
+VPNs, tunnels and bridges can count the same traffic more than once; this is host
+interface throughput, not an internet speed test or per-app bandwidth meter.
+Dayboard does not inspect IP/MAC addresses, connections, packet contents, or processes,
+and does not issue network probes. Telemetry history stays in memory and is not uploaded.
+Demo mode never constructs the real telemetry provider.
+
+### GitHub PRs and recent commits (development branch)
+
+Install [GitHub CLI](https://cli.github.com/) and sign in explicitly if you have not
+already done so:
+
+```zsh
+brew install gh
+gh auth login --hostname github.com --web
+```
+
+Use GitHub CLI's secure credential storage; do not use `--insecure-storage`.
+If gh reports a plaintext-storage fallback, resolve Keychain access before connecting.
+Dayboard delegates authenticated requests to gh; it never reads `gh auth token`,
+copies credentials into its config, or rotates/modifies your login. The gh account
+may have broader permissions than this dashboard uses; Dayboard sends read queries only.
+
+Select one to five repositories using repeatable `--repo OWNER/REPO` arguments:
+
+```zsh
+uv run --locked dayboard github set --repo bjorkgard/dashboard
+uv run --locked dayboard github status
+uv run --locked dayboard
+```
+
+`github set` saves only repository names and enablement. `github status` shows that
+local configuration, not a connectivity/authentication result. Neither command logs
+in or contacts GitHub. Restart the dashboard after changing settings.
+
+The **GitHub attention** card shows:
+
+- The server-reported open PR count for accessible selected repositories.
+- Up to five recently updated open PRs across those repositories, including drafts,
+  authors, review decision, CI/check rollup, and merge state where GitHub reports them.
+- Up to five recent commits across selected repositories, drawn from each five-commit default-branch
+  history, with shortened SHA, headline, author, and commit time.
+- Default branch names, explicit preview scope, and unavailable-repository counts.
+
+This is a repository overview—not a list limited to PRs authored by you, a personal
+review-request queue, an all-branches activity feed, or local unpushed commits.
+Each request reads at most ten PRs and five commits per selected repository; the card
+labels its preview rather than treating displayed rows as the complete server count.
+Absent review/check values remain **UNKNOWN**, never assumed successful.
+Partial access is shown; if nothing can be read, the card reports a setup/access error.
+Failed refreshes retain last-good snapshots with a stale indicator. Reported API rate
+limits defer further requests instead of polling aggressively.
+
+The initial adapter supports **github.com only**, uses one bounded GraphQL read query
+per refresh, and never merges PRs, writes comments, pushes commits, opens a browser,
+or starts a login automatically. Enterprise hosts, multi-login account selection,
+issues, notification queues, personal review requests and item-opening actions remain
+roadmap work. Returned titles/metadata stay in memory; no PR bodies, patches or email
+addresses are queried. Demo mode never constructs this reader.
+
+Disable collection without changing GitHub CLI's credentials:
+
+```zsh
+uv run --locked dayboard github disable
+```
+
+### Calendar and weather setup (development branch)
+
+These commands are not in the published v0.1.0 wheel yet. Run them from this source
+checkout after `uv sync --locked --extra dev`.
+
+For weather, choose your own coordinates and IANA timezone. This example uses
+Stockholm as an explicit example location, not an automatically detected position:
+
+```zsh
+uv run --locked dayboard weather set \
+  --latitude 59.3293 --longitude 18.0686 \
+  --name Stockholm --timezone Europe/Stockholm --units celsius
+uv run --locked dayboard
+```
+
+Weather refreshes about every 15 minutes, showing current model-derived conditions,
+apparent temperature, humidity, wind, and a four-hour outlook. It uses the
+[Open-Meteo](https://open-meteo.com/) public endpoint with
+[attribution and usage terms](https://open-meteo.com/en/terms); that endpoint is for
+noncommercial use. Commercial deployment needs a separately supported licensed
+configuration, not silent reuse of the free endpoint. No API key or IP-based
+geolocation is used. The label, coordinates and units are stored locally; the request
+sends the configured coordinates/timezone/units to Open-Meteo.
+
+For macOS Calendar:
+
+```zsh
+xcode-select --install  # only if Swift Command Line Tools are missing
+uv run --locked dayboard calendar authorize
+uv run --locked dayboard calendar status
+uv run --locked dayboard
+```
+
+`authorize` explicitly compiles the bundled helper and requests Calendar access.
+macOS may attribute that permission to your terminal/host application. If access
+is denied, review the host's Calendar privacy permission; hosts that cannot request
+EventKit access are not bypassed. macOS grants full Calendar access for this API,
+but Dayboard performs read-only operations.
+
+The agenda refreshes about every minute, expands recurring occurrences through
+EventKit, includes all-day events/source labels, and displays up to six events from
+a bounded seven-day window. At most 100 occurrences are transferred per collection;
+truncation is shown explicitly. All authorized calendars are included by default.
+An optional repeatable `--calendar-id` on `calendar authorize` filters known calendar
+identifiers before the native result cap. Calendar contents stay in memory.
+
+Disable collection independently and restart the dashboard to apply changes:
+
+```zsh
+uv run --locked dayboard weather disable
+uv run --locked dayboard calendar disable
+```
+
+Disabling Calendar does not revoke macOS permissions. Normal collection never
+builds a helper or opens a permission prompt. Demo mode remains completely isolated.
+Both modules retain their last good in-memory readings on failures and mark them
+stale; persistent offline weather restoration and account-authenticated calendar
+end-to-end verification are not claimed here.
+
+Configuration is now schema 3. Schemas 0/1/2 migrate in memory and are saved only on
+an explicit settings/onboarding action. The older v0.1.0 binary cannot read schema 3;
+do not downgrade against newly saved preferences without restoring an older backup.
+
+### Remaining development roadmap
+
+1. Finish this calendar/weather slice, then add in-app settings and full tabs.
+2. Expand calendar providers with ICS/CalDAV and Google/Microsoft authorization.
+3. Add Apple Reminders/Mail, Google Tasks/Gmail, Microsoft To Do/mail, and IMAP.
+4. Expand baseline Mac metrics with disk/battery/process views, then capability-checked
+   GPU/temperature/fan/power readings.
+5. Expand GitHub status with personal review queues/issues/notifications and local
+   repository monitoring; open-PR/default-branch commit previews are now implemented.
+6. Add opt-in Claude/Codex/Kiro/Warp analytics with honest source/estimate labels.
+7. Add the clickable aapl.io ticker, animated flip clock, responsive detail views,
+   reduced-motion options and resource/performance hardening.
 
 ### Controls and diagnostics
 
@@ -147,9 +319,11 @@ Application directories use mode `0700`; state files use `0600`. Unsafe symlinks
 hard links, nonregular state files, oversized files, and unsupported configuration
 schemas are rejected. A corrupt configuration is not silently reset or overwritten.
 
-The first milestone does not collect private account data or save credentials.
-Keychain behavior is unit-tested with synthetic adapters; diagnostics only check
-backend availability. Demo mode does not read or write normal application state.
+The published foundation does not collect private account data. In development,
+enabled Calendar reads upcoming events only after explicit permission; it never
+persists event contents. Keychain behavior is unit-tested with synthetic adapters;
+diagnostics only check backend availability. Demo mode does not read or write
+normal application state.
 
 Never commit credentials, `.env` files, exported private data, or local session logs.
 The repository ignores the virtual environment, caches, build outputs, and common

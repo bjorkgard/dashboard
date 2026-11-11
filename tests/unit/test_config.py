@@ -81,7 +81,7 @@ def test_known_schema_zero_migrates_without_overwriting_source(paths):
     assert config == Config(onboarding_complete=True)
     assert paths.config_file.read_text() == old
     ConfigStore(paths).save(config)
-    assert json.loads(paths.config_file.read_text())["schema_version"] == 1
+    assert json.loads(paths.config_file.read_text())["schema_version"] == Config().schema_version
 
 
 @pytest.mark.parametrize(

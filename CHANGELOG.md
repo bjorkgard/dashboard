@@ -6,7 +6,30 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
-Future features and fixes will be collected here before the next version is prepared.
+### Added
+
+- Opt-in GitHub.com status for one to five selected repositories: open PR totals and
+  bounded previews with draft/review/check states, plus recent default-branch commits.
+- GitHub CLI-owned authentication, explicit repository setup/disable/status commands,
+  rate-limit handling, partial-access indicators and safe in-memory metadata normalization.
+- Local CPU, memory and network telemetry in normal mode, sampled off the UI thread.
+  CPU/rates use owned counter baselines; unavailable/reset/warm-up intervals stay unknown.
+- Mac pulse sparklines with bounded histories, RAM in-use/available amounts and
+  upload/download rates in IEC byte units. Network scope excludes down/loopback interfaces.
+- Initial read-only macOS Calendar provider with a bundled Swift/EventKit bridge,
+  explicit permission setup, occurrence/source-aware normalization, and CLI enable/disable controls.
+- Opt-in Open-Meteo weather with configured coordinates/timezone/units, current
+  conditions and a short hourly outlook, bounded HTTP responses, and rate-limit handling.
+- Live overview status updates, observation timestamps, last-good retention and
+  actionable permission errors; disabled providers and demo mode never collect live data.
+- Strict configuration schema 3 with in-memory migration from schemas 0, 1 and 2.
+
+### Scope
+
+- These integrations are development changes after the published v0.1.0 release.
+  Account-authorized Calendar end-to-end verification still requires the user's consent.
+  Full Settings/tabs, direct cloud calendar OAuth, daily weather forecasts and persistent
+  offline-weather cache restoration remain future work.
 
 ## [0.1.0]
 

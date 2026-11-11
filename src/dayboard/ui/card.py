@@ -1,7 +1,7 @@
 from rich.text import Text
 from textual.widgets import Static
 
-from dayboard.core.models import Snapshot
+from dayboard.core.models import ErrorCode, Snapshot
 from dayboard.security.redaction import safe_text
 
 
@@ -11,12 +11,24 @@ class SnapshotCard(Static):
         self.panel_title = title
         self.show_snapshot(None)
 
-    def show_snapshot(self, snapshot: Snapshot | None) -> None:
+    def show_snapshot(
+        self,
+        snapshot: Snapshot | None,
+        *,
+        state: str = "",
+        error: ErrorCode | None = None,
+        loading: bool = False,
+    ) -> None:
         content = Text()
         content.append(self.panel_title + "\n\n", style="bold #88c0d0")
         if snapshot is None:
-            content.append("Not connected\n", style="#d8dee9")
-            content.append("Live integration arrives in a later milestone.", style="#8b95a7")
+            if error is not None:
+                content.append(error.value, style="#d7b875")
+            elif loading:
+                content.append("Loading live source…", style="#8b95a7")
+            else:
+                content.append("Not connected\n", style="#d8dee9")
+                content.append("Enable available sources with CLI setup.", style="#8b95a7")
         else:
             for metric in snapshot.metrics:
                 value = "Unknown" if metric.value is None else str(metric.value)
@@ -24,7 +36,10 @@ class SnapshotCard(Static):
                 content.append(f"{safe_text(value)} {safe_text(metric.unit)}\n", style="#eceff4")
             provenance = "SYNTHETIC" if snapshot.synthetic else snapshot.quality.value.upper()
             content.append(
-                f"\n{provenance} · observed " + snapshot.observed_at.strftime("%H:%M:%S %Z"),
+                f"\n{state.upper()} {provenance} · observed "
+                + snapshot.observed_at.astimezone().strftime("%d %b %H:%M:%S %Z"),
                 style="#d7b875",
             )
+            if error is not None:
+                content.append(f"\n{error.value}", style="#d7b875")
         self.update(content)

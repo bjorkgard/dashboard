@@ -6,6 +6,7 @@ from importlib.metadata import version
 from dayboard.app import DayboardApp
 from dayboard.config import ConfigError
 from dayboard.diagnostics import diagnose
+from dayboard.integration_commands import add_setup_commands, handle_setup
 from dayboard.paths import AppPaths
 from dayboard.security.redaction import redact
 
@@ -13,11 +14,13 @@ from dayboard.security.redaction import redact
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="dayboard",
-        description="Dayboard — a local-first macOS terminal workspace (milestone 1).",
+        description="Dayboard — a local-first macOS terminal workspace.",
         epilog=(
             "Run without arguments for first-run setup; use --demo for an isolated synthetic "
-            "preview. Press q to quit. Accounts, telemetry, tabs and news connections arrive "
-            "in later milestones. Credentials use macOS Keychain only; private state is kept "
+            "preview. Press q to quit. Use calendar/weather/github commands for explicit setup. "
+            "Other account providers, advanced sensors, tabs and news arrive later. "
+            "Dayboard-owned credentials use macOS Keychain; GitHub authentication stays with gh. "
+            "Private state is kept "
             "outside the project in the operating system's Dayboard application directories."
         ),
     )
@@ -30,7 +33,12 @@ def main(argv: list[str] | None = None) -> int:
         "doctor", help="allowlisted diagnostics; never reads credentials"
     )
     doctor.add_argument("--json", action="store_true", help="emit machine-readable diagnostics")
+    add_setup_commands(subparsers)
     args = parser.parse_args(argv)
+    if args.command in ("weather", "calendar", "github"):
+        if args.demo:
+            parser.error("--demo cannot be combined with integration setup.")
+        return handle_setup(args, AppPaths.default())
     if args.command == "doctor":
         if args.demo:
             parser.error("--demo cannot be combined with doctor.")

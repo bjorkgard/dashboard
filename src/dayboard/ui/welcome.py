@@ -22,12 +22,12 @@ class WelcomeScreen(Screen[Config]):
             with Vertical(id="welcome"):
                 yield Static("DAYBOARD / FIRST RUN", id="welcome-title", markup=False)
                 yield Static(
-                    "Your terminal workspace starts here.\n\n"
-                    "This is milestone 1: the secure foundation.\n"
-                    "Account selection and login arrive in later milestones.\n"
-                    "No accounts, private files, or system permissions are accessed now.\n\n"
-                    "Continue with an unconnected workspace, or quit without saving.\n"
-                    "For an isolated sample, run: uv run dayboard --demo",
+                    "Built on milestone 1: the secure foundation.\n"
+                    "Local CPU/RAM/network are live.\n"
+                    "Use CLI setup for Calendar, weather and GitHub.\n"
+                    "Optional integrations stay disabled until configured.\n\n"
+                    "Continue without cloud accounts, or quit without saving.\n"
+                    "Demo: uv run dayboard --demo",
                     id="welcome-copy",
                     markup=False,
                 )
