@@ -66,7 +66,7 @@ def test_calendar_status_does_not_build_or_authorize(paths, capsys):
 
 
 def test_calendar_authorize_saves_only_after_grant(paths, monkeypatch, capsys):
-    import dayboard.integration_commands as module
+    import dayboard.calendar_setup as module
 
     async def fake_build(paths):
         return paths.data_dir / "mock-bridge"
@@ -86,7 +86,7 @@ def test_calendar_authorize_saves_only_after_grant(paths, monkeypatch, capsys):
 
 
 def test_denial_does_not_enable_calendar(paths, monkeypatch, capsys):
-    import dayboard.integration_commands as module
+    import dayboard.calendar_setup as module
 
     async def fake_build(paths):
         return paths.data_dir / "mock-bridge"

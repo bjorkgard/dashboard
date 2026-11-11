@@ -17,7 +17,8 @@ def main(argv: list[str] | None = None) -> int:
         description="Dayboard — a local-first macOS terminal workspace.",
         epilog=(
             "Run without arguments for first-run setup; use --demo for an isolated synthetic "
-            "preview. Press q to quit. Use calendar/weather/github commands for explicit setup. "
+            "preview. Press s for in-dashboard Settings or q to quit. "
+            "CLI calendar/weather/github setup commands remain available. "
             "Other account providers, advanced sensors, tabs and news arrive later. "
             "Dayboard-owned credentials use macOS Keychain; GitHub authentication stays with gh. "
             "Private state is kept "

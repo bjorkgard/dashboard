@@ -6,7 +6,23 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+- In-dashboard integration Settings, opened with `s` or the visible Settings button,
+  plus a first-run Configure entry point and persistent keyboard-accessible Save/Cancel.
+- Explicit weather city lookup with disambiguated choices and manual coordinate support.
+  Results are never auto-selected; searches are bounded, cancellable and rate-limit aware.
+- Explicit Calendar authorization in the UI and GitHub repository editing without
+  password/token inputs or implicit account-login flows.
+- Live collector replacement after saved changes, resetting old-scope readings without
+  quitting the application. Failed writes keep the current collectors unchanged.
+- Conflict detection for externally changed integration preferences, preserved disabled
+  source settings, safe service-error messages, and read-only isolated demo Settings.
+
+### Fixed
+
+- Cancellation cleans up owned native/CLI descendant processes as well as their parent,
+  preventing a compiler child holding stdout from extending the cancellation deadline.
 
 ## [0.2.0] - 2026-11-11
 

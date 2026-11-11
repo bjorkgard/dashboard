@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import replace
 
 from textual.app import ComposeResult
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Static
 
@@ -24,19 +24,25 @@ class WelcomeScreen(Screen[Config]):
                 yield Static(
                     "Built on milestone 1: the secure foundation.\n"
                     "Local CPU/RAM/network are live.\n"
-                    "Use CLI setup for Calendar, weather and GitHub.\n"
+                    "Choose Configure for Calendar, weather and GitHub.\n"
                     "Optional integrations stay disabled until configured.\n\n"
                     "Continue without cloud accounts, or quit without saving.\n"
                     "Demo: uv run dayboard --demo",
                     id="welcome-copy",
                     markup=False,
                 )
-                yield Static("", id="setup-error", markup=False)
-                yield Button("Continue without accounts", id="continue", variant="primary")
-                yield Button("Quit without saving", id="quit")
+        yield Static("", id="setup-error", markup=False)
+        with Horizontal(id="welcome-actions"):
+            yield Button("Configure", id="configure", variant="primary")
+            yield Button("Continue", id="continue")
+            yield Button("Quit", id="quit")
         yield Footer()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "configure":
+            event.stop()
+            await self.app.run_action("settings")
+            return
         if event.button.id == "quit":
             await self.app.action_quit()
         elif event.button.id == "continue":
