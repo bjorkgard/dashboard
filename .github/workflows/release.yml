@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+    with:
+      release-tag: ${{ github.ref_name }}
+
+  publish:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download only this run's verified distributions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dayboard-distributions
+          path: dist
+          digest-mismatch: error
+
+      - name: Verify downloaded file checksums
+        working-directory: dist
+        run: sha256sum --check SHA256SUMS
+
+      - name: Publish GitHub Release for the existing verified tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          PACKAGE_VERSION: ${{ needs.checks.outputs.version }}
+          PRERELEASE: ${{ needs.checks.outputs.prerelease }}
+          RELEASE_COMMIT: ${{ needs.checks.outputs.commit }}
+        shell: bash
+        run: |
+          # Resolve lightweight or nested annotated tags, and reject a tag moved since building.
+          object="$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG")"
+          object_type="$(jq -r '.object.type' <<< "$object")"
+          object_sha="$(jq -r '.object.sha' <<< "$object")"
+          for _ in {1..8}; do
+            if [[ "$object_type" != "tag" ]]; then
+              break
+            fi
+            object="$(gh api "repos/$GH_REPO/git/tags/$object_sha")"
+            object_type="$(jq -r '.object.type' <<< "$object")"
+            object_sha="$(jq -r '.object.sha' <<< "$object")"
+          done
+          if [[ "$object_type" != "commit" || "$object_sha" != "$RELEASE_COMMIT" ]]; then
+            printf '%s\n' 'Release tag no longer matches the verified commit.' >&2
+            exit 1
+          fi
+          flags=()
+          if [[ "$PRERELEASE" == "true" ]]; then
+            flags+=(--prerelease --latest=false)
+          fi
+          gh release create "$RELEASE_TAG" \
+            dist/*.whl dist/*.tar.gz dist/SHA256SUMS \
+            --verify-tag --title "Dayboard $PACKAGE_VERSION" \
+            --generate-notes --notes-file dist/RELEASE_NOTES.md \
+            "${flags[@]}"

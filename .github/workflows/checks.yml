@@ -1,0 +1,122 @@
+name: Reusable checks
+
+on:
+  workflow_call:
+    inputs:
+      release-tag:
+        description: Optional exact release tag to validate
+        type: string
+        default: ""
+    outputs:
+      version:
+        description: Validated package version
+        value: ${{ jobs.verify.outputs.version }}
+      prerelease:
+        description: Whether the version is an alpha, beta, or RC
+        value: ${{ jobs.verify.outputs.prerelease }}
+      commit:
+        description: Exact commit used to build the verified artifacts
+        value: ${{ jobs.verify.outputs.commit }}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+      commit: ${{ steps.revision.outputs.commit }}
+    env:
+      UV_PYTHON: "3.13"
+      UV_NO_PROGRESS: "1"
+      DIST_DIR: dist
+      RELEASE_TAG: ${{ inputs.release-tag }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the requested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.13.7"
+          python-version: "3.13"
+          enable-cache: false
+
+      - name: Install Python and locked development dependencies
+        run: |
+          uv python install 3.13
+          uv sync --locked --extra dev
+
+      - name: Validate package version, lockfile, tag and changelog
+        id: metadata
+        run: |
+          args=()
+          if [[ -n "$RELEASE_TAG" ]]; then
+            args+=(--tag "$RELEASE_TAG")
+          fi
+          uv run --locked python scripts/release.py validate \
+            "${args[@]}" --github-output "$GITHUB_OUTPUT"
+
+      - name: Record commit and require release ancestry on main
+        id: revision
+        run: |
+          printf 'commit=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [[ -n "$RELEASE_TAG" ]]; then
+            git merge-base --is-ancestor HEAD origin/main
+          fi
+
+      - name: Test
+        run: uv run --locked pytest -q
+
+      - name: Lint, formatting and types
+        run: |
+          uv run --locked ruff check .
+          uv run --locked ruff format --check .
+          uv run --locked mypy src scripts
+
+      - name: Build distributions
+        run: uv build --out-dir "$DIST_DIR"
+
+      - name: Inspect packages and prepare checksums and release information
+        run: |
+          args=()
+          if [[ -n "$RELEASE_TAG" ]]; then
+            args+=(--tag "$RELEASE_TAG")
+          fi
+          uv run --locked python scripts/release.py prepare \
+            --dist "$DIST_DIR" "${args[@]}"
+
+      - name: Smoke-test installed wheel
+        env:
+          PACKAGE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          uv run --isolated --no-project --python 3.13 --with "$DIST_DIR"/*.whl \
+            python scripts/smoke_test.py --version "$PACKAGE_VERSION"
+
+      - name: Smoke-test installed source distribution
+        env:
+          PACKAGE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          uv run --isolated --no-project --python 3.13 --with "$DIST_DIR"/*.tar.gz \
+            python scripts/smoke_test.py --version "$PACKAGE_VERSION"
+
+      - name: Upload verified distributions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dayboard-distributions
+          path: |
+            ${{ env.DIST_DIR }}/*.whl
+            ${{ env.DIST_DIR }}/*.tar.gz
+            ${{ env.DIST_DIR }}/SHA256SUMS
+            ${{ env.DIST_DIR }}/RELEASE_NOTES.md
+          if-no-files-found: error
+          retention-days: 7

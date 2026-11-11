@@ -6,12 +6,18 @@ build-backend = "hatchling.build"
 name = "dayboard"
 version = "0.1.0"
 description = "A local-first terminal workspace for macOS"
+readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "textual>=6.6,<9",
     "platformdirs>=4.3,<5",
     "keyring>=25.6,<26",
 ]
+
+[project.urls]
+Repository = "https://github.com/bjorkgard/dashboard"
+Issues = "https://github.com/bjorkgard/dashboard/issues"
+Releases = "https://github.com/bjorkgard/dashboard/releases"
 
 [project.scripts]
 dayboard = "dayboard.cli:main"
@@ -26,7 +32,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
