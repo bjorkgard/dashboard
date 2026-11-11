@@ -1,6 +1,7 @@
 """Milestone-one shell. Real integrations and full navigation are intentionally absent."""
 
 from datetime import datetime
+from importlib.metadata import version
 
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Horizontal, VerticalScroll
@@ -48,7 +49,7 @@ class DayboardApp(App[None]):
     def compose(self) -> ComposeResult:
         with Horizontal(id="masthead"):
             yield Static("DAYBOARD", id="brand", markup=False)
-            yield Static("FOUNDATION / 0.1", id="release", markup=False)
+            yield Static(f"FOUNDATION / {version('dayboard')}", id="release", markup=False)
         yield Static(
             "DEMO · SYNTHETIC DATA · No accounts, network, or state access"
             if self.demo

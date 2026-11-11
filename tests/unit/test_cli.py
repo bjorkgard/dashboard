@@ -1,4 +1,5 @@
 import json
+from importlib.metadata import version
 
 import pytest
 
@@ -68,5 +69,5 @@ def test_version_needs_no_state(paths, capsys):
     with pytest.raises(SystemExit) as result:
         main(["--version"])
     assert result.value.code == 0
-    assert "0.1.0" in capsys.readouterr().out
+    assert f"dayboard {version('dayboard')}" in capsys.readouterr().out
     assert not paths.data_dir.exists()

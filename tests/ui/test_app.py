@@ -20,6 +20,16 @@ def text(widget):
     return str(widget.render())
 
 
+async def test_header_version_comes_from_installed_package_metadata(paths, monkeypatch):
+    import dayboard.app as module
+
+    monkeypatch.setattr(module, "version", lambda name: "9.8.7rc1", raising=False)
+    app = DayboardApp(demo=True, paths=paths)
+    async with app.run_test() as pilot:
+        assert "9.8.7rc1" in text(app.query_one("#release", Static))
+        await pilot.press("q")
+
+
 async def test_demo_is_isolated_even_with_broken_real_config(paths, monkeypatch):
     paths.ensure()
     paths.config_file.write_text('{"secret":"SYNTHETIC_SECRET","broken":true}')
