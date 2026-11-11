@@ -1,0 +1,109 @@
+Screen {
+    background: #10141b;
+    color: #d8dee9;
+}
+
+#masthead {
+    height: 3;
+    padding: 1 3 0 3;
+}
+
+#brand {
+    width: 1fr;
+    color: #eceff4;
+    text-style: bold;
+}
+
+#release {
+    width: 24;
+    color: #8b95a7;
+    text-align: right;
+}
+
+#mode {
+    height: auto;
+    min-height: 2;
+    padding: 0 3;
+    color: #d7b875;
+}
+
+#workspace {
+    padding: 0 3 1 3;
+}
+
+#clock {
+    height: 4;
+    color: #eceff4;
+    text-style: bold;
+    padding-top: 1;
+}
+
+#section-title {
+    height: 2;
+    color: #8b95a7;
+}
+
+#cards {
+    layout: grid;
+    grid-size: 2;
+    grid-gutter: 1 2;
+    grid-rows: 9;
+    height: auto;
+}
+
+.card {
+    height: 9;
+    padding: 1 2;
+    border: solid #303b4c;
+    background: #171d27;
+}
+
+#news-notice {
+    height: auto;
+    min-height: 3;
+    padding: 1 0;
+    color: #88c0d0;
+}
+
+#scope {
+    height: auto;
+    color: #8b95a7;
+    margin-bottom: 1;
+}
+
+Footer {
+    background: #1b2330;
+}
+
+#welcome-scroll {
+    padding: 2 3;
+}
+
+#welcome {
+    height: auto;
+    max-width: 90;
+    border: solid #303b4c;
+    padding: 1 3;
+    background: #171d27;
+}
+
+#welcome-title {
+    height: 2;
+    color: #88c0d0;
+    text-style: bold;
+}
+
+#welcome-copy {
+    height: auto;
+}
+
+#setup-error {
+    height: auto;
+    color: #ef9a9a;
+    margin: 1 0;
+}
+
+#welcome Button {
+    width: 100%;
+    margin-bottom: 1;
+}

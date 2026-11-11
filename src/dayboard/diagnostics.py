@@ -1,0 +1,38 @@
+"""Allowlisted diagnostics. Never read credentials or print account identities."""
+
+import platform
+import sys
+from importlib.metadata import version
+
+from dayboard.config import ConfigError, ConfigStore
+from dayboard.paths import AppPaths
+from dayboard.security.keychain import native_backend
+
+
+def diagnose(paths: AppPaths) -> tuple[dict[str, str | int | bool], bool]:
+    report: dict[str, str | int | bool] = {
+        "dayboard_version": version("dayboard"),
+        "python_version": platform.python_version(),
+        "platform": sys.platform,
+        "configuration": "missing",
+        "account_count": 0,
+        "keychain_backend": "unavailable",
+        "keychain_access": "not tested (no credentials read)",
+        "live_integrations": "not implemented in milestone 1",
+    }
+    healthy = True
+    try:
+        config = ConfigStore(paths).load()
+        if config is not None:
+            report["configuration"] = "valid"
+            report["account_count"] = len(config.accounts)
+            report["onboarding_complete"] = config.onboarding_complete
+    except ConfigError:
+        report["configuration"] = "invalid"
+        healthy = False
+    try:
+        native_backend()
+        report["keychain_backend"] = "macOS backend available"
+    except Exception:
+        healthy = False
+    return report, healthy
