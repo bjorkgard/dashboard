@@ -1,6 +1,8 @@
 """Owned, output-bounded subprocesses with no captured stderr or interactive input."""
 
 import asyncio
+import os
+import signal
 
 from dayboard.core.models import ErrorCode
 from dayboard.core.providers import ProviderUnavailable
@@ -23,6 +25,7 @@ async def run_bounded(
         stderr=asyncio.subprocess.DEVNULL,
         limit=MAX_OUTPUT_BYTES,
         env=env,
+        start_new_session=os.name == "posix",
     )
     try:
         async with asyncio.timeout(timeout):
@@ -36,6 +39,14 @@ async def run_bounded(
                 raise ProviderUnavailable(ErrorCode.UNAVAILABLE)
             return bytes(output)
     finally:
+        # Descendants can retain stdout after the direct child exits. Each POSIX command
+        # owns a new session, so group cleanup cannot target the caller's shell/session.
+        try:
+            if os.name == "posix":
+                os.killpg(process.pid, signal.SIGKILL)
+            elif process.returncode is None:
+                process.kill()
+        except ProcessLookupError:
+            pass
         if process.returncode is None:
-            process.kill()
             await process.wait()

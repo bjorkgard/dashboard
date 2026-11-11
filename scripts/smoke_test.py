@@ -5,9 +5,10 @@ import asyncio
 from importlib.metadata import version
 from importlib.resources import files
 
-from textual.widgets import Static
+from textual.widgets import Button, Static
 
 from dayboard.app import DayboardApp
+from dayboard.ui.settings import SettingsScreen
 
 
 async def smoke(expected_version: str) -> None:
@@ -28,6 +29,16 @@ async def smoke(expected_version: str) -> None:
             raise RuntimeError("Isolated smoke test did not start in demo mode.")
         if not app.store.history(app.registry.all()[0].spec.key):
             raise RuntimeError("Synthetic collector did not produce a reading.")
+        await pilot.press("s")
+        await pilot.pause()
+        if not isinstance(app.screen, SettingsScreen):
+            raise RuntimeError("Installed Settings screen did not open.")
+        if not app.screen.query_one("#settings-save", Button).disabled:
+            raise RuntimeError("Demo Settings must not allow saving real preferences.")
+        await pilot.press("escape")
+        await pilot.pause()
+        if isinstance(app.screen, SettingsScreen):
+            raise RuntimeError("Cancel did not return to the installed overview.")
         await pilot.press("q")
     if app.scheduler.running_count:
         raise RuntimeError("Collectors remained alive after exit.")

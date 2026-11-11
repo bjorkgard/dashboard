@@ -24,9 +24,9 @@ async def test_first_run_actions_fit_in_small_terminal(paths):
     app = DayboardApp(paths=paths)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
-        viewport = app.screen.query_one("#welcome-scroll").content_region
-        assert app.screen.query_one("#continue", Button).region.bottom <= viewport.bottom
-        assert app.screen.query_one("#quit", Button).region.bottom <= viewport.bottom
+        viewport = app.screen.region
+        for identifier in ("configure", "continue", "quit"):
+            assert app.screen.query_one(f"#{identifier}", Button).region.bottom <= viewport.bottom
         await pilot.press("q")
 
 

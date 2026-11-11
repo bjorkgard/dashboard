@@ -13,6 +13,10 @@ GitHub.com open-PR and recent-default-branch commit status.
 Advanced hardware sensors and the other account integrations remain planned.
 Demo values are synthetic, not readings from your Mac or accounts.
 
+**Unreleased development work:** an in-dashboard Settings screen now provides city
+lookup, Calendar authorization and GitHub editing, with live application of saved
+preferences. This is not included in the published v0.2.0 wheel yet.
+
 ## What works today
 
 - A terminal workspace with a ticking local clock and foundation-preview cards.
@@ -91,9 +95,47 @@ Start the normal workspace:
 uv run --locked dayboard
 ```
 
-On first launch, choose **Continue without accounts** to save onboarding preferences,
-or **Quit without saving**. Only explicitly configured sources become live; normal
-mode never substitutes synthetic data. Basic local telemetry is available automatically.
+On first launch, use **Configure** to set up integrations, **Continue** to proceed
+without cloud accounts, or **Quit** without saving. (v0.2.0 uses the longer
+Continue without accounts / Quit without saving labels.) Only explicitly configured
+sources become live; normal mode never substitutes synthetic data. Basic local telemetry
+is available automatically.
+
+### In-dashboard Settings (unreleased)
+
+From this source checkout, press **s** or click **Settings [s]** on the overview.
+The first-run **Configure** action opens the same screen.
+
+- **Weather:** type a city/postal code, press Search or Enter, then explicitly select
+  a city/region/country result. No result is selected automatically and no IP geolocation
+  is used. Coordinates, display name, IANA timezone and units can also be entered manually.
+  Search sends the typed query to Open-Meteo only on an explicit action; GeoNames-based
+  results and the public endpoint's noncommercial terms apply.
+- **Calendar:** opening Settings checks status without compiling a helper or requesting
+  access. **Authorize Calendar** explicitly builds/requests permission; **Save** is still
+  required to enable collection. Cancel can stop the operation but does not undo an OS
+  permission grant already accepted. Existing calendar-ID filters remain unchanged.
+- **GitHub:** enable status and enter one to five `OWNER/REPO` selections separated by
+  commas or spaces. Authentication remains owned by `gh`; no credential fields or silent
+  login are introduced. Saved enablement and current readability are shown separately.
+- **Save / Ctrl-S:** validate and persist preferences, stop old collectors, reset their
+  in-memory readings, and start the saved sources without exiting. CPU/network rates warm
+  up again; data from an old location/filter/repository scope is never relabelled as new.
+- **Cancel / Escape:** discard edits and return to the overview (or first-run screen).
+  Search/authorization tasks and owned subprocesses are cancelled. During the short
+  atomic save, duplicate submissions and Cancel are disabled to avoid racing a write.
+
+Disabled sources preserve their saved location/repositories rather than saving incomplete
+inputs. Integration edits detected when saving cause a conflict message instead of
+silently replacing those changes; Cancel and reopen to load the latest values.
+Failed writes leave the form open and the running sources unchanged. If sources cannot
+restart after a successful write, old collectors stay stopped and the app reports it.
+
+Actions remain visible in small terminals; Tab/Shift-Tab navigate, Enter activates, and
+typing `q` in a text field does not quit the app. Settings in demo mode are read-only:
+no file access/saves, city requests, native status checks or permission prompts.
+The existing CLI setup commands remain supported and still require restarting a running
+dashboard to pick up CLI-only changes.
 
 ### CPU, memory and network monitoring
 
@@ -245,7 +287,7 @@ do not downgrade against newly saved preferences without restoring an older back
 
 ### Remaining development roadmap
 
-1. Add in-app settings and full tabs for the initial live integration modules.
+1. Finish full workspace tabs/detail views; in-app Settings is available in development.
 2. Expand calendar providers with ICS/CalDAV and Google/Microsoft authorization.
 3. Add Apple Reminders/Mail, Google Tasks/Gmail, Microsoft To Do/mail, and IMAP.
 4. Expand baseline Mac metrics with disk/battery/process views, then capability-checked

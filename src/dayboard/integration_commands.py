@@ -6,10 +6,11 @@ import sys
 from dataclasses import replace
 from typing import Any
 
+from dayboard.calendar_setup import authorize_calendar, calendar_status
 from dayboard.config import Config, ConfigError, ConfigStore
 from dayboard.core.providers import ProviderUnavailable
 from dayboard.github_commands import add_github_commands, handle_github_setup
-from dayboard.integrations.native import CalendarBridge, bridge_path, build_bridge
+from dayboard.integrations.native import bridge_path
 from dayboard.paths import AppPaths
 from dayboard.settings import CalendarSettings, WeatherSettings
 
@@ -37,11 +38,6 @@ def add_setup_commands(subparsers: Any) -> None:
     )
     actions.add_parser("status", help="read permission status only; never builds or prompts")
     actions.add_parser("disable", help="stop event collection without revoking macOS permissions")
-
-
-async def _authorize(paths: AppPaths) -> dict[str, Any]:
-    executable = await build_bridge(paths)
-    return await CalendarBridge(executable).call("authorize")
 
 
 def handle_setup(args: argparse.Namespace, paths: AppPaths) -> int:
@@ -73,13 +69,13 @@ def handle_setup(args: argparse.Namespace, paths: AppPaths) -> int:
             if not bridge_path(paths).exists():
                 print("Calendar helper not built. Run 'dayboard calendar authorize' to set up.")
                 return 1
-            result = asyncio.run(CalendarBridge(bridge_path(paths)).call("status"))
+            result = asyncio.run(calendar_status(paths))
         else:
             calendar = CalendarSettings(
                 True,
                 tuple(args.calendar_id) if args.calendar_id else config.calendar.calendar_ids,
             )
-            result = asyncio.run(_authorize(paths))
+            result = asyncio.run(authorize_calendar(paths))
             if result.get("status") == "authorized":
                 store.save(replace(config, calendar=calendar))
         status = result.get("status")
