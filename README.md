@@ -13,7 +13,7 @@ GitHub.com open-PR and recent-default-branch commit status.
 Advanced hardware sensors and the other account integrations remain planned.
 Demo values are synthetic, not readings from your Mac or accounts.
 
-**New in v0.3.0:** an in-dashboard Settings screen provides city
+**New in v0.3.0:** an [in-dashboard Settings screen](#in-dashboard-settings) provides city
 lookup, Calendar authorization and GitHub editing, with live application of saved
 preferences. The existing v0.2.0 integrations remain supported.
 
@@ -106,6 +106,27 @@ is available automatically.
 
 In v0.3.0 or newer, press **s** or click **Settings [s]** on the overview.
 The first-run **Configure** action opens the same screen.
+
+#### Quick setup
+
+1. Start normal mode with `uv run --locked dayboard` from this checkout, or
+   `dayboard` if installed from a release. Demo Settings are read-only.
+2. Open Settings with **s**, the **Settings [s]** button, or first-run **Configure**.
+3. Set up only the sources you want:
+   - **Weather:** search for your city and select the correct region/country result,
+     or enter coordinates manually; choose the timezone and units, and enable Weather.
+   - **Calendar:** click **Authorize Calendar**, review the macOS permission request,
+     and enable collection after access is granted.
+   - **GitHub:** enable status and enter up to five `OWNER/REPO` selections. If
+     necessary, authenticate separately with GitHub CLI as described below.
+4. Click **Save [Ctrl-S]** or press **Ctrl-S**. The overview stays running while
+   collectors restart with the new settings; CPU/network rates briefly warm up.
+   To discard edits instead, use **Cancel [Esc]** or **Escape**.
+
+Disabled sources keep their previously saved location/repository choices. Saving
+does not start a login or silently request Calendar access.
+
+#### Settings behavior and safety
 
 - **Weather:** type a city/postal code, press Search or Enter, then explicitly select
   a city/region/country result. No result is selected automatically and no IP geolocation
@@ -301,7 +322,10 @@ do not downgrade against newly saved preferences without restoring an older back
 
 ### Controls and diagnostics
 
-- **q** — quit.
+- **q** — quit from the overview; in Settings, cancel when not editing text.
+- **s** — open Settings (read-only in demo mode).
+- **Ctrl-S** — save and apply Settings without exiting the dashboard.
+- **Escape** — cancel Settings without saving; close an open dropdown first.
 - **?** — help.
 - **Tab / Shift-Tab** — move focus.
 - **Arrow keys / Page Up / Page Down** — scroll the focused scrollable area.
