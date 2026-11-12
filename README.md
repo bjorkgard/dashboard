@@ -20,8 +20,8 @@ preferences. The existing v0.2.0 integrations remain supported.
 **New in v0.4.0:** Overview, Schedule, Mac and GitHub tabs provide expanded views of
 the existing live sources. v0.3.0 retains the single overview.
 
-**Unreleased (development checkout):** opt-in Claude Code local usage and a fifth
-AI tab. This is not included in the published v0.4.0 wheel.
+**New in v0.5.0:** opt-in Claude Code local usage and a fifth AI tab, with
+metadata-only accounting and explicit local-source coverage.
 
 ## What works today
 
@@ -40,6 +40,8 @@ AI tab. This is not included in the published v0.4.0 wheel.
 - Automatic local CPU/RAM/network readings and short live histories.
 - Selected-repository GitHub PR previews, draft/review/check states,
   and recent default-branch commits, using GitHub CLI's existing authentication.
+- Opt-in Claude Code local token categories, observed sessions and model summaries,
+  with bounded read-only collection and an in-memory ledger.
 - Unit, headless UI, and real pseudo-terminal startup/shutdown tests.
 
 Account selection/login, Inbox detail tabs, the animated flip clock, GPU/temperature
@@ -112,7 +114,7 @@ is available automatically.
 
 ### Workspace navigation (v0.4.0+)
 
-Dayboard includes four workspace tabs:
+Dayboard includes five workspace tabs (AI requires v0.5.0+):
 
 - **1 — Overview:** clock, weather and compact integration cards. Agenda previews
   remain limited to six events; GitHub previews show up to five PRs and five commits.
@@ -127,8 +129,10 @@ Dayboard includes four workspace tabs:
   The existing query returns at most ten PRs and five commits per repository
   (up to 50 PRs and 25 commits across five repositories); this is not a complete
   account-wide feed or personal review queue.
+- **5 — AI:** Claude Code local usage, calendar-window totals and model summaries,
+  with explicit partial-coverage and indexing indicators.
 
-Press **1–4** or click a tab. **Tab / Shift-Tab** moves focus; **Left / Right**
+Press **1–5** or click a tab. **Tab / Shift-Tab** moves focus; **Left / Right**
 switches tabs when the tab bar is focused. Focus a scroll region to use arrow keys
 and **Page Up / Page Down**; number shortcuts focus the selected region directly.
 The overview uses one column below 100 terminal columns and two on wider terminals.
@@ -143,12 +147,12 @@ to the selected tab; Save resets old-scope readings in both overview and detail
 views. Number keys remain normal text input in Settings and do not navigate
 underneath onboarding. Tab selection is session-only, not saved as a preference.
 Demo tabs use synthetic data only; no new permissions or credentials are required.
-Inbox detail tabs remain deferred until their live providers exist. The development
-checkout adds the opt-in Claude AI tab described below.
+Inbox detail tabs remain deferred until their live providers exist. v0.5.0 adds
+the opt-in Claude AI tab described below.
 
-### Claude Code local usage (unreleased)
+### Claude Code local usage (v0.5.0+)
 
-1. Run the development checkout in normal mode, then press **s**.
+1. Run Dayboard v0.5.0+ in normal mode, then press **s**.
 2. Read the Claude privacy notice. Confirm a single absolute Claude root containing
    `projects/` (normally `~/.claude`; a single `CLAUDE_CONFIG_DIR` value can be offered
    as a candidate). There is no automatic search of alternative locations.
@@ -214,6 +218,8 @@ The first-run **Configure** action opens the same screen.
      and enable collection after access is granted.
    - **GitHub:** enable status and enter up to five `OWNER/REPO` selections. If
      necessary, authenticate separately with GitHub CLI as described below.
+   - **Claude:** review the privacy notice, confirm the local source and timezone,
+     then enable collection. No login or API key is required.
 4. Click **Save [Ctrl-S]** or press **Ctrl-S**. The overview stays running while
    collectors restart with the new settings; CPU/network rates briefly warm up.
    To discard edits instead, use **Cancel [Esc]** or **Escape**.
@@ -398,11 +404,10 @@ Both modules retain their last good in-memory readings on failures and mark them
 stale; persistent offline weather restoration and account-authenticated calendar
 end-to-end verification are not claimed here.
 
-The development checkout uses configuration schema 4 for Claude preferences.
+Dayboard v0.5.0 uses configuration schema 4 for Claude preferences.
 Schemas 0/1/2/3 migrate in memory with Claude disabled and are written only on an
 explicit Save/onboarding action. Published v0.4.0 and earlier cannot read schema 4;
-back up preferences before using the development checkout, and restore a compatible
-backup before downgrading. Package version remains 0.4.0 until a separately requested release.
+back up preferences before upgrading, and restore a compatible backup before downgrading.
 
 ### Remaining development roadmap
 
@@ -414,7 +419,7 @@ backup before downgrading. Package version remains 0.4.0 until a separately requ
    GPU/temperature/fan/power readings.
 5. Expand GitHub status with personal review queues/issues/notifications and local
    repository monitoring; open-PR/default-branch commit previews are now implemented.
-6. Extend AI analytics: Claude local usage is implemented in the development checkout;
+6. Extend AI analytics: Claude local usage shipped in v0.5.0;
    Codex/Kiro/Warp, durable usage storage, quotas and pricing remain planned.
 7. Add the clickable aapl.io ticker, animated flip clock, responsive detail views,
    reduced-motion options and resource/performance hardening.
@@ -423,7 +428,7 @@ backup before downgrading. Package version remains 0.4.0 until a separately requ
 
 - **q** — quit from any workspace tab; in Settings, cancel when not editing text.
 - **1 / 2 / 3 / 4** — Overview / Schedule / Mac / GitHub (v0.4.0+).
-- **5** — AI / Claude local usage (development checkout).
+- **5** — AI / Claude local usage (v0.5.0+).
 - **Left / Right** — switch tabs when the tab bar is focused (v0.4.0+).
 - **s** — open Settings (read-only in demo mode).
 - **Ctrl-S** — save and apply Settings without exiting the dashboard.
@@ -465,11 +470,11 @@ From the directory containing all three downloads:
 
 ```zsh
 shasum -a 256 -c SHA256SUMS
-uv tool install --python 3.13 ./dayboard-0.4.0-py3-none-any.whl
+uv tool install --python 3.13 ./dayboard-0.5.0-py3-none-any.whl
 dayboard --demo
 ```
 
-The filename above illustrates v0.4.0; use the filename attached to
+The filename above illustrates v0.5.0; use the filename attached to
 your selected release. To install a newer downloaded wheel over an existing
 installation, add `--reinstall`. If `dayboard` is not found, run
 `uv tool update-shell` and open a new terminal. Checksums detect corrupted downloads;

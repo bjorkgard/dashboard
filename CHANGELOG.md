@@ -6,6 +6,10 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.5.0] - 2026-11-12
+
 ### Added
 
 - Opt-in Claude Code local usage with an AI tab (`5`) and compact overview counters.
