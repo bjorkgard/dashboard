@@ -6,6 +6,10 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.6.0] - 2026-11-12
+
 ### Added
 
 - Opt-in Apple Mail header sampling, explicit Automation authorization and bounded
@@ -39,7 +43,7 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 - Kiro support is format-specific, without SQLite/auth access, token estimates or quota probes.
   Warp run usage can overlap across conversations and is not a desktop/account total.
 - No persistent private history, real permission/account access during tests, automatic
-  login, inference requests, version bump or installation changes.
+  login, inference requests or automatic installation changes.
 
 ## [0.5.0] - 2026-11-12
 
