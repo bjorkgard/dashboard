@@ -98,6 +98,31 @@ Footer {
     background: #1b2330;
 }
 
+#mail-boxes {
+    height: 8;
+}
+
+ConfirmWarpDisconnect {
+    align: center middle;
+}
+
+#warp-confirm {
+    width: 72;
+    max-width: 95%;
+    height: auto;
+    padding: 1 2;
+    border: solid #88c0d0;
+    background: #171d27;
+}
+
+#warp-confirm Horizontal {
+    height: 3;
+}
+
+#warp-confirm Button {
+    width: 1fr;
+}
+
 #welcome-scroll {
     padding: 1 3;
 }

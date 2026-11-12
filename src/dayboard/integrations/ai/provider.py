@@ -7,7 +7,7 @@ from contextlib import suppress
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
-from dayboard.core.ai_usage import UsageLedger
+from dayboard.core.ai_usage import UsageLedger, UsageRecord
 from dayboard.core.models import Coverage, Metric, ProviderKey, Quality, Snapshot
 from dayboard.core.providers import Capability, ProviderSpec
 from dayboard.integrations.ai.reader import ClaudeReader, ScanBatch, ScanCancelled
@@ -32,7 +32,9 @@ class ClaudeProvider:
             timeout_seconds=10,
         )
 
-    def _collect(self, stop: threading.Event) -> tuple[ScanBatch, UsageLedger, Snapshot]:
+    def _collect(
+        self, stop: threading.Event
+    ) -> tuple[ScanBatch[UsageRecord], UsageLedger, Snapshot]:
         batch = self.reader.scan(stop)
         try:
             return self._aggregate(batch, stop)
@@ -42,12 +44,14 @@ class ClaudeProvider:
 
     def _aggregate(
         self,
-        batch: ScanBatch,
+        batch: ScanBatch[UsageRecord],
         stop: threading.Event,
-    ) -> tuple[ScanBatch, UsageLedger, Snapshot]:
+    ) -> tuple[ScanBatch[UsageRecord], UsageLedger, Snapshot]:
         now = datetime.now(UTC)
         ledger = UsageLedger(timezone=self.settings.timezone, limit=self.ledger.limit)
         ledger.records = self.ledger.records.copy()
+        ledger.originals = self.ledger.originals.copy()
+        ledger.historical_originals = self.ledger.historical_originals.copy()
         ledger.quarantined = self.ledger.quarantined.copy()
         ledger.capped = self.ledger.capped
         ledger.prune(now)
@@ -62,7 +66,6 @@ class ClaudeProvider:
         if extra_issues:
             batch = replace(batch, issues=batch.issues | extra_issues)
         partial = bool(batch.issues or ledger.conflicts or ledger.capped)
-        incomplete = batch.pending or partial
         metrics = [
             Metric(
                 "coverage",
@@ -103,7 +106,7 @@ class ClaudeProvider:
                     Metric(
                         f"{prefix}-{identifier}",
                         f"{days}d {label}",
-                        None if not summary.requests and incomplete else value,
+                        value if summary.requests else None,
                         "tokens",
                     )
                 )
@@ -111,7 +114,7 @@ class ClaudeProvider:
                 Metric(
                     f"{prefix}-sessions",
                     f"{days}d observed sessions",
-                    None if not summary.requests and incomplete else summary.sessions,
+                    summary.sessions if summary.requests else None,
                 )
             )
         latest = max((record.timestamp for record in ledger.records.values()), default=None)

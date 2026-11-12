@@ -52,6 +52,8 @@ class UsageLedger:
         self.zone = ZoneInfo(timezone)
         self.limit = limit
         self.records: dict[str, UsageRecord] = {}
+        self.originals: dict[str, datetime] = {}
+        self.historical_originals: dict[str, datetime] = {}
         self.quarantined: dict[str, datetime] = {}
         self.capped = False
 
@@ -61,6 +63,10 @@ class UsageLedger:
 
     def prune(self, now: datetime) -> None:
         cutoff = now.astimezone(self.zone).date() - timedelta(days=29)
+        for key, stamp in tuple(self.originals.items()):
+            if stamp.astimezone(self.zone).date() < cutoff:
+                self._remember_historical(key, stamp)
+                del self.originals[key]
         self.records = {
             key: item
             for key, item in self.records.items()
@@ -74,9 +80,19 @@ class UsageLedger:
 
     def add(self, item: UsageRecord, now: datetime) -> bool:
         today = now.astimezone(self.zone).date()
-        if not today - timedelta(days=29) <= item.timestamp.astimezone(self.zone).date() <= today:
-            return False
         key = item.message_id
+        known = self.originals.get(key, self.historical_originals.get(key, item.timestamp))
+        original = min(known, item.timestamp)
+        item = replace(item, timestamp=original)
+        if not today - timedelta(days=29) <= original.astimezone(self.zone).date() <= today:
+            self.records.pop(key, None)
+            self.originals.pop(key, None)
+            self._remember_historical(key, original)
+            return False
+        if key not in self.originals and len(self.originals) >= self.limit:
+            self.capped = True
+            return False
+        self.originals[key] = original
         if key in self.quarantined:
             return False
         old = self.records.get(key)
@@ -108,6 +124,14 @@ class UsageLedger:
             request_id=old.request_id or item.request_id,
         )
         return True
+
+    def _remember_historical(self, key: str, stamp: datetime) -> None:
+        if key in self.historical_originals:
+            self.historical_originals[key] = min(self.historical_originals[key], stamp)
+        elif len(self.historical_originals) < self.limit:
+            self.historical_originals[key] = stamp
+        else:
+            self.capped = True
 
     def summary(
         self,

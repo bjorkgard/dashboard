@@ -35,6 +35,7 @@ class Scheduler:
         self._due: dict[ProviderKey, float] = {}
         self._failures: dict[ProviderKey, int] = {}
         self._closed = False
+        self._stopped: set[ProviderKey] = set()
         self._on_change = on_change
 
     @property
@@ -49,7 +50,7 @@ class Scheduler:
             raise RuntimeError("A closed scheduler cannot be restarted.")
         for provider in self.registry.all():
             key = provider.spec.key
-            if key not in self._tasks:
+            if key not in self._tasks and key not in self._stopped:
                 self._tasks[key] = asyncio.create_task(self._loop(key), name="dayboard-collector")
 
     async def _loop(self, key: ProviderKey) -> None:
@@ -60,7 +61,12 @@ class Scheduler:
     async def refresh(self, key: ProviderKey) -> bool:
         provider = self.registry.get(key)
         lock = self._locks.setdefault(key, asyncio.Lock())
-        if self._closed or lock.locked() or self.next_due(key) > self._clock():
+        if (
+            self._closed
+            or key in self._stopped
+            or lock.locked()
+            or self.next_due(key) > self._clock()
+        ):
             return False
         async with lock:
             error: ErrorCode | None = None
@@ -100,6 +106,17 @@ class Scheduler:
         if self._on_change is not None:
             self._on_change()
         return True
+
+    async def stop_source(self, key: ProviderKey) -> None:
+        """Stop one source before explicit secret cleanup without pausing other collectors."""
+        self._stopped.add(key)
+        task = self._tasks.pop(key, None)
+        if task is not None:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        provider = self.registry.get(key)
+        if isinstance(provider, ClosableProvider):
+            provider.close()
 
     async def close(self) -> None:
         self._closed = True

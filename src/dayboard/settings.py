@@ -172,3 +172,183 @@ class GitHubSettings:
 
     def encode(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "repositories": list(self.repositories)}
+
+
+@dataclass(frozen=True)
+class MailboxSelection:
+    account_id: str
+    mailbox_path: tuple[str, ...]
+    account_name: str = ""
+
+    def __post_init__(self) -> None:
+        if (
+            not _text(self.account_id, 256)
+            or not self.account_id
+            or not _text(self.account_name, 100)
+            or not isinstance(self.mailbox_path, tuple)
+            or not 1 <= len(self.mailbox_path) <= 8
+            or not all(_text(part, 200) and part for part in self.mailbox_path)
+        ):
+            raise ConfigError("Invalid Mail mailbox selection.")
+
+    def encode(self) -> dict[str, Any]:
+        return {
+            "account_id": self.account_id,
+            "mailbox_path": list(self.mailbox_path),
+            "account_name": self.account_name,
+        }
+
+    @classmethod
+    def decode(cls, value: Any) -> "MailboxSelection":
+        if (
+            not isinstance(value, dict)
+            or value.keys() - {"account_id", "mailbox_path", "account_name"}
+            or not isinstance(value.get("mailbox_path"), list)
+        ):
+            raise ConfigError("Invalid Mail mailbox selection.")
+        return cls(
+            value.get("account_id", ""), tuple(value["mailbox_path"]), value.get("account_name", "")
+        )
+
+
+@dataclass(frozen=True)
+class MailSettings:
+    enabled: bool = False
+    mailboxes: tuple[MailboxSelection, ...] = ()
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.enabled) is not bool
+            or not isinstance(self.mailboxes, tuple)
+            or len(self.mailboxes) > 5
+            or (self.enabled and not self.mailboxes)
+            or not all(isinstance(item, MailboxSelection) for item in self.mailboxes)
+        ):
+            raise ConfigError("Select one to five Mail mailboxes when enabled.")
+        identities = {(item.account_id, item.mailbox_path) for item in self.mailboxes}
+        if len(identities) != len(self.mailboxes):
+            raise ConfigError("Duplicate Mail mailbox selection.")
+
+    def encode(self) -> dict[str, Any]:
+        return {"enabled": self.enabled, "mailboxes": [item.encode() for item in self.mailboxes]}
+
+    @classmethod
+    def decode(cls, value: Any) -> "MailSettings":
+        if not isinstance(value, dict) or value.keys() - {"enabled", "mailboxes"}:
+            raise ConfigError("Unexpected Mail settings.")
+        boxes = value.get("mailboxes", [])
+        if not isinstance(boxes, list) or len(boxes) > 5:
+            raise ConfigError("Invalid Mail mailbox list.")
+        return cls(value.get("enabled", False), tuple(MailboxSelection.decode(v) for v in boxes))
+
+
+@dataclass(frozen=True)
+class CodexSettings:
+    enabled: bool = False
+    source_root: str = ""
+    timezone: str = "UTC"
+    limits_enabled: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.enabled) is not bool or type(self.limits_enabled) is not bool:
+            raise ConfigError("Invalid Codex enablement.")
+        try:
+            ClaudeSettings(self.enabled or self.limits_enabled, self.source_root, self.timezone)
+        except ConfigError:
+            raise ConfigError("Choose an absolute Codex root and valid IANA timezone.") from None
+
+    def encode(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "source_root": self.source_root,
+            "timezone": self.timezone,
+            "limits_enabled": self.limits_enabled,
+        }
+
+    @classmethod
+    def decode(cls, value: Any) -> "CodexSettings":
+        if not isinstance(value, dict) or value.keys() - {
+            "enabled",
+            "source_root",
+            "timezone",
+            "limits_enabled",
+        }:
+            raise ConfigError("Unexpected Codex settings.")
+        return cls(**value)
+
+
+@dataclass(frozen=True)
+class KiroSettings:
+    enabled: bool = False
+    source_root: str = ""
+    timezone: str = "UTC"
+
+    def __post_init__(self) -> None:
+        try:
+            ClaudeSettings(self.enabled, self.source_root, self.timezone)
+        except ConfigError:
+            raise ConfigError(
+                "Choose an absolute Kiro sessions root and valid IANA timezone."
+            ) from None
+
+    def encode(self) -> dict[str, Any]:
+        return {"enabled": self.enabled, "source_root": self.source_root, "timezone": self.timezone}
+
+    @classmethod
+    def decode(cls, value: Any) -> "KiroSettings":
+        if not isinstance(value, dict) or value.keys() - {"enabled", "source_root", "timezone"}:
+            raise ConfigError("Unexpected Kiro settings.")
+        return cls(**value)
+
+
+@dataclass(frozen=True)
+class WarpSettings:
+    enabled: bool = False
+    credential_id: str = "default"
+    team_uid: str = ""
+    retired_credential_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.enabled) is not bool
+            or not isinstance(self.credential_id, str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", self.credential_id)
+            or not isinstance(self.team_uid, str)
+            or (self.team_uid and not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", self.team_uid))
+            or not isinstance(self.retired_credential_ids, tuple)
+            or len(self.retired_credential_ids) > 8
+            or not all(
+                isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value)
+                for value in self.retired_credential_ids
+            )
+            or len(set(self.retired_credential_ids)) != len(self.retired_credential_ids)
+            or self.credential_id in self.retired_credential_ids
+        ):
+            raise ConfigError("Invalid Warp scope or credential reference.")
+
+    def encode(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "credential_id": self.credential_id,
+            "team_uid": self.team_uid,
+            "retired_credential_ids": list(self.retired_credential_ids),
+        }
+
+    @classmethod
+    def decode(cls, value: Any) -> "WarpSettings":
+        if not isinstance(value, dict) or value.keys() - {
+            "enabled",
+            "credential_id",
+            "team_uid",
+            "retired_credential_ids",
+        }:
+            raise ConfigError("Unexpected Warp preferences; credentials belong in Keychain.")
+        retired = value.get("retired_credential_ids", [])
+        if not isinstance(retired, list):
+            raise ConfigError("Invalid Warp credential references.")
+        return cls(
+            value.get("enabled", False),
+            value.get("credential_id", "default"),
+            value.get("team_uid", ""),
+            tuple(retired),
+        )

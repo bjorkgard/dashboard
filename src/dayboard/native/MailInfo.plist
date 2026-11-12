@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>dev.dayboard.mail-bridge</string>
+    <key>CFBundleName</key><string>Dayboard Mail Bridge</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Dayboard samples sender, subject, received date and read status from explicitly selected Mail mailboxes. macOS grants broader Automation permission; Dayboard only reads these headers and mailbox labels.</string>
+</dict>
+</plist>
