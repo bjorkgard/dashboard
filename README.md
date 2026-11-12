@@ -23,9 +23,8 @@ the existing live sources. v0.3.0 retains the single overview.
 **New in v0.5.0:** opt-in Claude Code local usage and a fifth AI tab, with
 metadata-only accounting and explicit local-source coverage.
 
-**Unreleased (source checkout):** Apple Mail headers and Inbox (`6`), independent
+**New in v0.6.0:** Apple Mail headers and Inbox (`6`), independent
 Codex/Kiro/Warp-Oz modules, multi-source AI rendering, and recent-first Claude indexing.
-These additions are not in the published v0.5.0 wheel.
 
 ## What works today
 
@@ -46,6 +45,8 @@ These additions are not in the published v0.5.0 wheel.
   and recent default-branch commits, using GitHub CLI's existing authentication.
 - Opt-in Claude Code local token categories, observed sessions and model summaries,
   with bounded read-only collection and an in-memory ledger.
+- Apple Mail header previews, Codex local/optional limit reads, observed-format Kiro
+  credits and documented Oz run usage, with independent source states and setup.
 - Unit, headless UI, and real pseudo-terminal startup/shutdown tests.
 
 Direct cloud account login, the animated flip clock, GPU/temperature graphs,
@@ -66,9 +67,9 @@ after explicit permission; new cloud-account login is not implemented in this sl
 - Python **3.13 or newer**. The commands below install Python 3.13 through uv.
 
 Demo mode and weather do not require Xcode, administrator access, API keys, or
-Calendar/Mail permissions. The native Calendar module requires macOS 14+ and Swift
-Command Line Tools, plus explicit Calendar permission. Git may prompt you to install
-Apple's Command Line Tools if it is not already available.
+Calendar/Mail permissions. Native Calendar and Mail modules require macOS 14+ and Swift
+Command Line Tools, plus explicit Calendar/Automation permission respectively.
+Git may prompt you to install Apple's Command Line Tools if it is not already available.
 
 ### 1. Install uv
 
@@ -96,6 +97,8 @@ Normal mode reads local CPU/RAM/network counters without making network requests
 After weather setup, normal mode also contacts Open-Meteo; disabled account/weather
 sources and demo mode make no provider requests. Enabled GitHub status makes a
 bounded read query through GitHub CLI about once per minute.
+Opt-in Warp/Oz and Codex account-limit reads can also contact their configured services
+about every five minutes; local Claude/Codex/Kiro readers do not make provider requests.
 
 ### 3. Start Dayboard
 
@@ -119,7 +122,7 @@ is available automatically.
 
 ### Workspace navigation (v0.4.0+)
 
-Dayboard includes five workspace tabs (AI requires v0.5.0+):
+Dayboard includes six workspace tabs (AI requires v0.5.0+; Inbox requires v0.6.0+):
 
 - **1 — Overview:** clock, weather and compact integration cards. Agenda previews
   remain limited to six events; GitHub previews show up to five PRs and five commits.
@@ -135,11 +138,11 @@ Dayboard includes five workspace tabs (AI requires v0.5.0+):
   (up to 50 PRs and 25 commits across five repositories); this is not a complete
   account-wide feed or personal review queue.
 - **5 — AI:** Claude Code local usage, calendar-window totals and model summaries,
-  with explicit partial-coverage and indexing indicators. The development checkout
-  adds independent Codex local/limits, Kiro credits and Warp/Oz run sections.
-- **6 — Inbox (development checkout):** bounded Apple Mail header preview.
+  with explicit partial-coverage and indexing indicators. v0.6.0 adds independent
+  Codex local/limits, Kiro credits and Warp/Oz run sections.
+- **6 — Inbox (v0.6.0+):** bounded Apple Mail header preview.
 
-Press **1–5** (or **1–6** in the development checkout) or click a tab.
+Press **1–6** or click a tab.
 **Tab / Shift-Tab** moves focus; **Left / Right**
 switches tabs when the tab bar is focused. Focus a scroll region to use arrow keys
 and **Page Up / Page Down**; number shortcuts focus the selected region directly.
@@ -155,12 +158,12 @@ to the selected tab; Save resets old-scope readings in both overview and detail
 views. Number keys remain normal text input in Settings and do not navigate
 underneath onboarding. Tab selection is session-only, not saved as a preference.
 Demo tabs use synthetic data only; no new permissions or credentials are required.
-The published v0.5.0 adds the opt-in Claude AI tab described below. New Mail and
-AI modules are currently available only from the development checkout.
+v0.5.0 introduced the Claude AI tab. v0.6.0 adds Mail and the other AI modules
+described below.
 
-### Apple Mail and remaining AI setup (unreleased)
+### Apple Mail and remaining AI setup (v0.6.0+)
 
-Back up preferences before saving with this checkout: it writes **schema 5**,
+Back up preferences before upgrading: v0.6.0 writes **schema 5** on Save,
 which v0.5.0 and earlier cannot read. New sources are disabled when older preferences
 migrate in memory; existing source choices remain preserved. Open **Settings (`s`)**
 to opt in, then **Save / Ctrl-S** to apply. Cancel discards form edits.
@@ -279,7 +282,7 @@ deleted source history cannot be recovered. Collection targets five seconds; dir
 rediscovery targets 30 seconds. Initial limits are 5,000 files, eight directory levels,
 20,000 discovery entries, 8 MiB/two seconds of scan work per pass, 1 MiB per JSONL record,
 and 100,000 canonical requests over 30 calendar dates. Large backlogs index incrementally.
-Development indexing prioritizes recent file mtimes within the bounded discovery scope,
+v0.6.0 indexing prioritizes recent file mtimes within the bounded discovery scope,
 not guaranteed event recency. Claude reserves one bounded recent-tail preview while
 ordered backfill continues; identity reconciliation prevents replay double counting.
 Original-date metadata is separately bounded so old-only history cannot block fresh usage.
@@ -501,11 +504,11 @@ Both modules retain their last good in-memory readings on failures and mark them
 stale; persistent offline weather restoration and account-authenticated calendar
 end-to-end verification are not claimed here.
 
-Published v0.5.0 uses schema 4. The development checkout uses **schema 5** for Mail
+v0.5.0 uses schema 4. v0.6.0 uses **schema 5** for Mail
 and additional AI preferences. Schemas 0–4 migrate in memory with new sources disabled;
 existing integrations are preserved. Saving/onboarding writes schema 5, which published
-v0.5.0 and earlier cannot read. Back up preferences before using the checkout and restore
-a compatible backup before downgrading. Package version remains 0.5.0 pending a separate release.
+v0.5.0 and earlier cannot read. Back up preferences before upgrading and restore
+a compatible backup before downgrading.
 
 ### Remaining development roadmap
 
@@ -513,13 +516,13 @@ a compatible backup before downgrading. Package version remains 0.5.0 pending a 
    tabs shipped in v0.4.0, and Settings shipped in v0.3.0.
 2. Expand calendar providers with ICS/CalDAV and Google/Microsoft authorization.
 3. Add Apple Reminders, Google Tasks/Gmail, Microsoft To Do/Graph mail and IMAP;
-   Apple Mail header sampling is implemented in the development checkout.
+   Apple Mail header sampling shipped in v0.6.0.
 4. Expand baseline Mac metrics with disk/battery/process views, then capability-checked
    GPU/temperature/fan/power readings.
 5. Expand GitHub status with personal review queues/issues/notifications and local
    repository monitoring; open-PR/default-branch commit previews are now implemented.
 6. Extend AI analytics: Codex, observed-format Kiro credits and Oz run previews are
-   implemented in the checkout; broader formats, durable history, account-wide Kiro/Warp
+   included in v0.6.0; broader formats, durable history, account-wide Kiro/Warp
    limits and pricing estimates remain follow-ups. Claude shipped in v0.5.0.
 7. Add the clickable aapl.io ticker, animated flip clock, responsive detail views,
    reduced-motion options and resource/performance hardening.
@@ -529,7 +532,7 @@ a compatible backup before downgrading. Package version remains 0.5.0 pending a 
 - **q** — quit from any workspace tab; in Settings, cancel when not editing text.
 - **1 / 2 / 3 / 4** — Overview / Schedule / Mac / GitHub (v0.4.0+).
 - **5** — AI / Claude local usage (v0.5.0+).
-- **6** — Inbox / Apple Mail headers (development checkout).
+- **6** — Inbox / Apple Mail headers (v0.6.0+).
 - **Left / Right** — switch tabs when the tab bar is focused (v0.4.0+).
 - **s** — open Settings (read-only in demo mode).
 - **Ctrl-S** — save and apply Settings without exiting the dashboard.
@@ -571,11 +574,11 @@ From the directory containing all three downloads:
 
 ```zsh
 shasum -a 256 -c SHA256SUMS
-uv tool install --python 3.13 ./dayboard-0.5.0-py3-none-any.whl
+uv tool install --python 3.13 ./dayboard-0.6.0-py3-none-any.whl
 dayboard --demo
 ```
 
-The filename above illustrates v0.5.0; use the filename attached to
+The filename above illustrates v0.6.0; use the filename attached to
 your selected release. To install a newer downloaded wheel over an existing
 installation, add `--reinstall`. If `dayboard` is not found, run
 `uv tool update-shell` and open a new terminal. Checksums detect corrupted downloads;
