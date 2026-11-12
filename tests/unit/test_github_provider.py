@@ -195,3 +195,75 @@ async def test_preview_never_claims_its_rows_are_the_full_server_count():
     snapshot = await provider.collect()
     assert next(m.value for m in snapshot.metrics if m.id == "open-pr-count") == 20
     assert "preview" in str(next(m.value for m in snapshot.metrics if m.id == "scope")).lower()
+
+
+async def test_detail_retains_all_already_fetched_prs_without_another_query():
+    data = response()
+    repo = data["data"]["r0"]
+    first = repo["pullRequests"]["nodes"][0]
+    repo["pullRequests"].update(
+        totalCount=20,
+        nodes=[
+            {
+                **deepcopy(first),
+                "number": i + 1,
+                "url": f"https://github.com/{REPOSITORY}/pull/{i + 1}",
+            }
+            for i in range(10)
+        ],
+    )
+    reader = Reader(data)
+    snapshot = await GitHubProvider(
+        GitHubSettings(True, (REPOSITORY,)), reader, clock=lambda: NOW
+    ).collect()
+    assert sum(m.id.startswith("pr-") for m in snapshot.metrics) == 10
+    scope = next(m.value for m in snapshot.metrics if m.id == "detail-scope")
+    assert "10 of 20" in scope and "bounded" in scope.lower()
+    assert reader.calls == 1
+
+
+async def test_five_repository_detail_snapshot_stays_within_existing_model_bounds():
+    repositories = tuple(f"owner/repo{i}" for i in range(5))
+    data = response()
+    for index, name in enumerate(repositories):
+        repo = repository()
+        repo["nameWithOwner"] = name
+        first = repo["pullRequests"]["nodes"][0]
+        repo["pullRequests"].update(
+            totalCount=30,
+            nodes=[
+                {
+                    **deepcopy(first),
+                    "number": i + 1,
+                    "url": f"https://github.com/{name}/pull/{i + 1}",
+                }
+                for i in range(10)
+            ],
+        )
+        first_commit = repo["defaultBranchRef"]["target"]["history"]["nodes"][0]
+        repo["defaultBranchRef"]["target"]["history"]["nodes"] = [
+            {
+                **deepcopy(first_commit),
+                "oid": f"{i + 1:040x}",
+                "url": f"https://github.com/{name}/commit/{i + 1:040x}",
+            }
+            for i in range(5)
+        ]
+        data["data"][f"r{index}"] = repo
+
+    class BoundedReader:
+        calls = 0
+
+        async def fetch(self, selected):
+            assert selected == repositories
+            self.calls += 1
+            return data
+
+    reader = BoundedReader()
+    snapshot = await GitHubProvider(
+        GitHubSettings(True, repositories), reader, clock=lambda: NOW
+    ).collect()
+    assert sum(m.id.startswith("pr-") for m in snapshot.metrics) == 50
+    assert sum(m.id.startswith("commit-") for m in snapshot.metrics) == 25
+    assert len(snapshot.metrics) < 256
+    assert reader.calls == 1

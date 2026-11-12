@@ -119,7 +119,7 @@ class CalendarProvider:
                 + (" · truncated" if data.get("truncated") else ""),
             )
         ]
-        for index, event in enumerate(events[:6]):
+        for index, event in enumerate(events):
             label = event.start.astimezone().strftime("%a %d %b")
             label += " · all day" if event.all_day else event.start.astimezone().strftime(" %H:%M")
             metrics.append(

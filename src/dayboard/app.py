@@ -1,20 +1,23 @@
-"""Local-first overview with explicitly enabled calendar, weather and GitHub sources."""
+"""Tabbed local-first workspace with shared, explicitly configured collectors."""
 
 from datetime import datetime
 from importlib.metadata import version
 
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Grid, Horizontal, VerticalScroll
-from textual.widgets import Button, Footer, Static
+from textual.events import Resize
+from textual.widgets import Button, Footer, Static, TabbedContent, TabPane
 
 from dayboard.config import Config, ConfigError, ConfigStore
-from dayboard.core.models import ProviderKey
+from dayboard.core.models import ConnectionState, ProviderKey, SourceStatus
 from dayboard.core.providers import Capability, ProviderRegistry
 from dayboard.core.scheduler import Scheduler
 from dayboard.core.store import SnapshotStore
 from dayboard.integrations.runtime import build_live_registry
 from dayboard.paths import AppPaths
 from dayboard.ui.card import SnapshotCard
+from dayboard.ui.details import DetailCard
 from dayboard.ui.settings import SettingsScreen
 from dayboard.ui.telemetry import TelemetryCard
 from dayboard.ui.welcome import WelcomeScreen
@@ -33,9 +36,13 @@ class DayboardApp(App[None]):
     TITLE = "Dayboard"
     CSS_PATH = "ui/styles/shell.tcss"
     BINDINGS = [
-        ("q", "quit", "Quit"),
-        ("s", "settings", "Settings"),
-        ("question_mark", "help", "Help"),
+        Binding("q", "quit", "Quit"),
+        Binding("s", "settings", "Settings"),
+        Binding("question_mark", "help", "Help"),
+        Binding("1", "workspace('overview')", "Overview", show=False),
+        Binding("2", "workspace('schedule')", "Schedule", show=False),
+        Binding("3", "workspace('mac')", "Mac", show=False),
+        Binding("4", "workspace('github')", "GitHub", show=False),
     ]
 
     def __init__(self, *, demo: bool = False, paths: AppPaths | None = None) -> None:
@@ -62,7 +69,7 @@ class DayboardApp(App[None]):
     def compose(self) -> ComposeResult:
         with Horizontal(id="masthead"):
             yield Static("DAYBOARD", id="brand", markup=False)
-            yield Static(f"FOUNDATION / {version('dayboard')}", id="release", markup=False)
+            yield Static(f"WORKSPACE / {version('dayboard')}", id="release", markup=False)
             yield Button("Settings [s]", id="settings-open")
         yield Static(
             "DEMO · SYNTHETIC DATA · No accounts, network, or state access"
@@ -71,34 +78,84 @@ class DayboardApp(App[None]):
             id="mode",
             markup=False,
         )
-        with VerticalScroll(id="workspace"):
-            yield Static("", id="clock", markup=False)
-            yield Static(
-                "AT A GLANCE   /   Foundation preview"
-                if self.demo
-                else "AT A GLANCE   /   Ready for your future integrations",
-                id="section-title",
-                markup=False,
-            )
-            with Grid(id="cards"):
-                for panel, name, _ in PANELS:
-                    if panel == "mac" and not self.demo:
-                        yield TelemetryCard(panel, name)
+        with TabbedContent(initial="overview", id="workspace-tabs"):
+            with TabPane("1 Overview", id="overview"):
+                with VerticalScroll(id="workspace", classes="workspace-scroll"):
+                    yield Static("", id="clock", markup=False)
+                    yield Static(
+                        "AT A GLANCE   /   Synthetic preview" if self.demo else "AT A GLANCE",
+                        id="section-title",
+                        markup=False,
+                    )
+                    with Grid(id="cards"):
+                        for panel, name, _ in PANELS:
+                            if panel == "mac" and not self.demo:
+                                yield TelemetryCard(panel, name)
+                            else:
+                                yield SnapshotCard(panel, name)
+                    yield Static(
+                        "APPLE NEWS  /  Feed connection and clickable ticker "
+                        "remain on the roadmap.",
+                        id="news-notice",
+                        markup=False,
+                    )
+                    yield Static(
+                        "Local CPU/RAM/network are live. Calendar/weather/GitHub are opt-in. "
+                        "Mail, AI integrations and flip-clock animation remain on the roadmap.",
+                        id="scope",
+                        markup=False,
+                    )
+            with TabPane("2 Schedule", id="schedule"):
+                with VerticalScroll(id="schedule-scroll", classes="workspace-scroll"):
+                    yield Static(
+                        "SCHEDULE / Next seven days · local timezone\n"
+                        "Read-only macOS Calendar; up to 100 occurrences with source labels. "
+                        "Reminders and additional calendar providers remain planned.",
+                        classes="detail-note",
+                        markup=False,
+                    )
+                    yield DetailCard("schedule-detail", "SEVEN-DAY AGENDA")
+            with TabPane("3 Mac", id="mac"):
+                with VerticalScroll(id="mac-scroll", classes="workspace-scroll"):
+                    yield Static(
+                        "MAC / CPU, memory and network\n"
+                        "Shared bounded history; unknown samples are dots, not zeros. "
+                        "Network totals may duplicate VPN/bridge traffic. "
+                        "Disk, battery, processes and advanced sensors remain planned.",
+                        classes="detail-note",
+                        markup=False,
+                    )
+                    if self.demo:
+                        yield DetailCard("mac-detail", "SYNTHETIC MAC METRICS")
                     else:
-                        yield SnapshotCard(panel, name)
-            yield Static(
-                "APPLE NEWS  /  Feed connection and clickable ticker remain on the roadmap.",
-                id="news-notice",
-                markup=False,
-            )
-            yield Static(
-                "Local CPU/RAM/network are live. Calendar/weather/GitHub are opt-in. "
-                "Full tabs, mail and "
-                "flip-clock animation remain on the roadmap.",
-                id="scope",
-                markup=False,
-            )
+                        yield TelemetryCard("mac-detail", "RECENT CPU / RAM / NETWORK")
+                        yield DetailCard("mac-metrics", "COLLECTED METRICS")
+            with TabPane("4 GitHub", id="github"):
+                with VerticalScroll(id="github-scroll", classes="workspace-scroll"):
+                    yield Static(
+                        "GITHUB / Selected repositories on github.com\n"
+                        "Bounded read-only PR and default-branch commit lists, "
+                        "not an account-wide activity feed. No extra requests on tab changes.",
+                        classes="detail-note",
+                        markup=False,
+                    )
+                    yield DetailCard("github-detail", "REPOSITORY ACTIVITY")
         yield Footer()
+
+    def action_workspace(self, pane: str) -> None:
+        # Never navigate underneath Settings/onboarding or consume their text input.
+        if self.screen is not self.screen_stack[0] or self._applying_settings:
+            return
+        if pane not in ("overview", "schedule", "mac", "github"):
+            return
+        self.query_one("#workspace-tabs", TabbedContent).active = pane
+        scroll = "workspace" if pane == "overview" else f"{pane}-scroll"
+        self.query_one(f"#{scroll}", VerticalScroll).focus()
+
+    def on_resize(self, event: Resize) -> None:
+        cards = self.screen_stack[0].query("#cards")
+        if cards:
+            cards.first(Grid).styles.grid_size_columns = 1 if event.size.width < 100 else 2
 
     async def on_mount(self) -> None:
         if self.demo:
@@ -211,27 +268,34 @@ class DayboardApp(App[None]):
             now.strftime("%H:%M:%S") + "\n" + now.strftime("%A, %B %d  ·  %Z")
         )
         for panel, _, capability in PANELS:
-            card = base.query_one(f"#card-{panel}", SnapshotCard)
+            cards = [base.query_one(f"#card-{panel}", SnapshotCard)]
+            if panel in ("schedule", "mac", "github"):
+                cards.append(base.query_one(f"#card-{panel}-detail", SnapshotCard))
+            if panel == "mac" and not self.demo:
+                cards.append(base.query_one("#card-mac-metrics", SnapshotCard))
             if self.demo:
-                snapshot = self.store.status(ProviderKey(f"demo-{panel}")).snapshot
-                card.show_snapshot(snapshot)
+                status = self.store.status(ProviderKey(f"demo-{panel}"))
+                for card in cards:
+                    card.show_snapshot(status.snapshot, state=status.state.value)
                 continue
             provider = next(
                 (p for p in self.registry.all() if capability in p.spec.capabilities),
                 None,
             )
-            if provider is not None:
-                status = self.store.status(
-                    provider.spec.key, stale_after=provider.spec.interval_seconds * 2
-                )
-                if isinstance(card, TelemetryCard):
+            status = (
+                self.store.status(provider.spec.key, stale_after=provider.spec.interval_seconds * 2)
+                if provider is not None
+                else SourceStatus(ConnectionState.DISCONNECTED)
+            )
+            for card in cards:
+                if isinstance(card, TelemetryCard) and provider is not None:
                     card.show_telemetry(status, self.store.history(provider.spec.key))
                 else:
                     card.show_snapshot(
                         status.snapshot,
                         state=status.state.value,
                         error=status.error,
-                        loading=status.attempted_at is None,
+                        loading=provider is not None and status.attempted_at is None,
                     )
 
     async def action_quit(self) -> None:
@@ -240,10 +304,11 @@ class DayboardApp(App[None]):
 
     def action_help(self) -> None:
         self.notify(
-            "q: Quit · s: Settings · Tab: Focus · Arrows/Page Down: Scroll · "
+            "1–4: Overview / Schedule / Mac / GitHub · q: Quit · s: Settings · "
+            "Tab/Shift-Tab: Focus · Left/Right on tabs: Switch · Arrows/Page Down: Scroll · "
             "Ctrl-S: Save / Esc: Cancel in Settings · "
-            "uv run dayboard doctor: Safe diagnostics. Full workspace tabs remain planned.",
-            title="Dayboard / Foundation",
+            "uv run dayboard doctor: Safe diagnostics.",
+            title="Dayboard / Workspace",
         )
 
     async def on_unmount(self) -> None:

@@ -86,6 +86,14 @@ class GitHubProvider:
                 f"Preview: showing {min(5, len(pull_requests))} of {total} open PRs; "
                 "up to 5 recent commits from bounded default-branch histories",
             ),
+            Metric(
+                "detail-scope",
+                "Bounded detail",
+                f"Bounded view: showing {len(pull_requests)} of {total} open PRs "
+                "in accessible repositories "
+                f"and {len(commits)} recent default-branch commits. "
+                "At most 10 PRs and 5 commits per repository; not a personal review queue.",
+            ),
         ]
         if report.unavailable:
             metrics.append(
@@ -100,7 +108,7 @@ class GitHubProvider:
             metrics.append(
                 Metric("no-prs", "Pull requests", "No open PRs in accessible repositories")
             )
-        for index, pr in enumerate(pull_requests[:5]):
+        for index, pr in enumerate(pull_requests):
             metrics.append(
                 Metric(
                     f"pr-{index}",
@@ -113,7 +121,7 @@ class GitHubProvider:
             metrics.append(
                 Metric("no-commits", "Recent commits", "No default-branch commits available")
             )
-        for index, commit in enumerate(commits[:5]):
+        for index, commit in enumerate(commits):
             when = commit.committed_at.astimezone().strftime("%d %b %H:%M")
             metrics.append(
                 Metric(
