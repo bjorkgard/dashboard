@@ -17,8 +17,8 @@ Demo values are synthetic, not readings from your Mac or accounts.
 lookup, Calendar authorization and GitHub editing, with live application of saved
 preferences. The existing v0.2.0 integrations remain supported.
 
-**Unreleased (source checkout):** Overview, Schedule, Mac and GitHub tabs provide
-expanded views of the existing live sources. Published v0.3.0 retains the single overview.
+**New in v0.4.0:** Overview, Schedule, Mac and GitHub tabs provide expanded views of
+the existing live sources. v0.3.0 retains the single overview.
 
 ## What works today
 
@@ -26,7 +26,7 @@ expanded views of the existing live sources. Published v0.3.0 retains the single
 - An isolated `--demo` mode with changing synthetic readings.
 - First-run onboarding that can save an unconnected workspace or quit without saving.
 - In-dashboard Settings with city lookup and live Save/Cancel configuration.
-- In the development checkout: keyboard/mouse tab navigation and expanded agenda,
+- Keyboard/mouse tab navigation and expanded agenda,
   Mac telemetry history, and bounded GitHub PR/commit detail views.
 - Strict, versioned configuration with owner-only permissions and atomic writes.
 - A macOS Keychain credential wrapper with no plaintext fallback.
@@ -107,9 +107,9 @@ Continue without accounts / Quit without saving labels.) Only explicitly configu
 sources become live; normal mode never substitutes synthetic data. Basic local telemetry
 is available automatically.
 
-### Workspace navigation (unreleased)
+### Workspace navigation (v0.4.0+)
 
-The development checkout includes four workspace tabs:
+Dayboard includes four workspace tabs:
 
 - **1 — Overview:** clock, weather and compact integration cards. Agenda previews
   remain limited to six events; GitHub previews show up to five PRs and five commits.
@@ -350,7 +350,7 @@ do not downgrade against newly saved preferences without restoring an older back
 ### Remaining development roadmap
 
 1. Extend workspace detail views as new providers arrive; Overview/Schedule/Mac/GitHub
-   tabs are implemented in the development checkout, and Settings shipped in v0.3.0.
+   tabs shipped in v0.4.0, and Settings shipped in v0.3.0.
 2. Expand calendar providers with ICS/CalDAV and Google/Microsoft authorization.
 3. Add Apple Reminders/Mail, Google Tasks/Gmail, Microsoft To Do/mail, and IMAP.
 4. Expand baseline Mac metrics with disk/battery/process views, then capability-checked
@@ -364,8 +364,8 @@ do not downgrade against newly saved preferences without restoring an older back
 ### Controls and diagnostics
 
 - **q** — quit from any workspace tab; in Settings, cancel when not editing text.
-- **1 / 2 / 3 / 4** — Overview / Schedule / Mac / GitHub (development checkout).
-- **Left / Right** — switch tabs when the tab bar is focused (development checkout).
+- **1 / 2 / 3 / 4** — Overview / Schedule / Mac / GitHub (v0.4.0+).
+- **Left / Right** — switch tabs when the tab bar is focused (v0.4.0+).
 - **s** — open Settings (read-only in demo mode).
 - **Ctrl-S** — save and apply Settings without exiting the dashboard.
 - **Escape** — cancel Settings without saving; close an open dropdown first.
@@ -406,11 +406,11 @@ From the directory containing all three downloads:
 
 ```zsh
 shasum -a 256 -c SHA256SUMS
-uv tool install --python 3.13 ./dayboard-0.3.0-py3-none-any.whl
+uv tool install --python 3.13 ./dayboard-0.4.0-py3-none-any.whl
 dayboard --demo
 ```
 
-The filename above illustrates v0.3.0; use the filename attached to
+The filename above illustrates v0.4.0; use the filename attached to
 your selected release. To install a newer downloaded wheel over an existing
 installation, add `--reinstall`. If `dayboard` is not found, run
 `uv tool update-shell` and open a new terminal. Checksums detect corrupted downloads;

@@ -6,6 +6,10 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.4.0] - 2026-11-12
+
 ### Added
 
 - Overview, Schedule, Mac and GitHub workspace tabs with visible mouse targets,
@@ -24,7 +28,7 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 - Loading, stale, error, provenance and partial-access states remain visible. Settings
   Save clears old-scope readings across all views; demo tabs remain synthetic and isolated.
 - No new account providers, Inbox/AI detail tabs, hardware sensors or persistent tab
-  preference are introduced. Package version and configuration schema are unchanged.
+  preference are introduced. Configuration schema remains 3.
 
 ## [0.3.0] - 2026-11-11
 
