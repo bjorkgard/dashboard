@@ -66,7 +66,7 @@ async def test_demo_is_isolated_even_with_broken_real_config(paths, monkeypatch)
 async def test_collectors_stop_when_application_is_unmounted_without_quit(paths):
     app = DayboardApp(demo=True, paths=paths)
     async with app.run_test():
-        assert app.scheduler.running_count == 6
+        assert app.scheduler.running_count == len(app.registry.all())
     assert app.scheduler.running_count == 0
 
 

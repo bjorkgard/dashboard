@@ -48,7 +48,7 @@ def test_old_config_migrates_only_in_memory_with_claude_disabled(environment, ve
     before = json.dumps({"schema_version": version})
     paths.config_file.write_text(before)
     config = store.load()
-    assert config.schema_version == 4 and not config.claude.enabled
+    assert config.schema_version == 5 and not config.claude.enabled
     assert paths.config_file.read_text() == before
 
 

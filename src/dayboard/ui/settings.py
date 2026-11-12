@@ -4,6 +4,7 @@ import asyncio
 import math
 import os
 from collections.abc import Coroutine
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -12,21 +13,27 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Input, Select, Static, Switch
+from textual.widgets import Button, Footer, Input, Select, SelectionList, Static, Switch
 from textual.worker import Worker
 
 from dayboard.calendar_setup import authorize_calendar, calendar_status
 from dayboard.config import Config, ConfigError, ConfigStore
 from dayboard.core.providers import RateLimited
+from dayboard.core.scheduler import Scheduler
+from dayboard.integrations.ai.warp import WarpProvider
 from dayboard.integrations.geocoding import Geocoder, LocationChoice
+from dayboard.integrations.mail import authorize_mail, discover_mailboxes, mail_status
 from dayboard.paths import AppPaths
 from dayboard.security.redaction import safe_text
+from dayboard.security.warp_credentials import disable_warp, disconnect_warp
+from dayboard.settings import CodexSettings, KiroSettings
 from dayboard.settings_editor import (
     SettingsDraft,
     SettingsValidationError,
     build_candidate,
     save_draft,
 )
+from dayboard.ui.warp_confirm import ConfirmWarpDisconnect
 
 
 class SettingsScreen(Screen[Config | None]):
@@ -59,6 +66,8 @@ class SettingsScreen(Screen[Config | None]):
         self._calendar_state = "unknown"
         self._authorizing = False
         self._saving = False
+        self._mail_busy = False
+        self._mail_choices = config.mail.mailboxes
 
     def compose(self) -> ComposeResult:
         disabled = self.demo
@@ -210,8 +219,82 @@ class SettingsScreen(Screen[Config | None]):
                     "Save explicitly confirms this source. No scanning on screen entry. "
                     "Restart/Save rebuilds the bounded 30-day in-memory history. "
                     "Disabling preserves preferences, clears readings and never deletes "
-                    "Claude logs. Saving migrates preferences to schema 4; "
+                    "Claude logs. Saving migrates preferences to schema 5; "
                     "older releases cannot read that file.",
+                    classes="settings-note",
+                    markup=False,
+                )
+            with Vertical(classes="settings-panel"):
+                yield Static(
+                    "APPLE MAIL · HEADER PREVIEW", classes="settings-section", markup=False
+                )
+                yield Static(
+                    f"Current: {self.connections.get('mail', 'not connected')}. "
+                    "Only fixed header reads; no bodies, attachments or message actions. "
+                    "Open Mail yourself before authorizing. The Automation grant is broader "
+                    "than Dayboard's read-only behavior. "
+                    "Cancel does not revoke an accepted OS grant.",
+                    classes="settings-note",
+                    markup=False,
+                )
+                with Horizontal(classes="settings-toggle"):
+                    yield Static("Enable selected Mail mailboxes", markup=False)
+                    yield Switch(self.config.mail.enabled, id="mail-enabled", disabled=disabled)
+                yield Button("Check Mail status", id="mail-status-check", disabled=disabled)
+                yield Button("Authorize Mail Automation", id="mail-authorize", disabled=disabled)
+                yield Button("Discover mailboxes", id="mail-discover", disabled=disabled)
+                yield Static(
+                    "Discovery is explicit and bounded (20 accounts / 200 mailboxes / depth 8). "
+                    "Select up to five; Save is required to start collection.",
+                    id="mail-status",
+                    classes="settings-note",
+                    markup=False,
+                )
+                yield SelectionList[int](
+                    *[
+                        (Text(self._mail_label(box)), index, True)
+                        for index, box in enumerate(self._mail_choices)
+                    ],
+                    id="mail-boxes",
+                    disabled=disabled,
+                )
+            yield from self._local_ai_panel("codex", self.config.codex)
+            yield from self._local_ai_panel("kiro", self.config.kiro)
+            with Vertical(classes="settings-panel"):
+                yield Static("WARP / OZ · RUN PREVIEW", classes="settings-section", markup=False)
+                yield Static(
+                    f"Current: {self.connections.get('warp', 'not connected')}. "
+                    "Network opt-in: one page from the documented Oz API every five minutes. "
+                    "Run/conversation usage may overlap; "
+                    "no desktop-wide usage or remaining credits. "
+                    "The API key may have broader rights, but Dayboard only sends GET requests.",
+                    classes="settings-note",
+                    markup=False,
+                )
+                with Horizontal(classes="settings-toggle"):
+                    yield Static("Enable Warp / Oz run usage", markup=False)
+                    yield Switch(self.config.warp.enabled, id="warp-enabled", disabled=disabled)
+                yield Static(
+                    "Optional team UID (blank = key's accessible scope)", classes="settings-label"
+                )
+                yield Input(self.config.warp.team_uid, id="warp-team", disabled=disabled)
+                yield Static(
+                    "New API key (masked; blank preserves saved key). Keys stay in macOS Keychain.",
+                    classes="settings-label",
+                    markup=False,
+                )
+                yield Input(password=True, max_length=4096, id="warp-key", disabled=disabled)
+                yield Button("Test Warp connection (read-only)", id="warp-test", disabled=disabled)
+                yield Button(
+                    "Disconnect Warp and remove Dayboard keys",
+                    id="warp-disconnect",
+                    disabled=disabled,
+                )
+                yield Static(
+                    "Test does not save. Save stages a new key before committing preferences. "
+                    "Disabling preserves keys; confirmed Disconnect removes only Dayboard keys "
+                    "and immediately applies the disabled configuration.",
+                    id="warp-status",
                     classes="settings-note",
                     markup=False,
                 )
@@ -219,6 +302,56 @@ class SettingsScreen(Screen[Config | None]):
             yield Button("Save [Ctrl-S]", id="settings-save", variant="primary", disabled=disabled)
             yield Button("Cancel [Esc]", id="settings-cancel")
         yield Footer()
+
+    @staticmethod
+    def _mail_label(box: Any) -> str:
+        return safe_text(f"{box.account_name or box.account_id} / {' / '.join(box.mailbox_path)}")
+
+    def _local_ai_panel(self, name: str, settings: CodexSettings | KiroSettings) -> ComposeResult:
+        with Vertical(classes="settings-panel"):
+            yield Static(name.upper() + " · LOCAL USAGE", classes="settings-section", markup=False)
+            yield Static(
+                f"Current: {self.connections.get(name, 'not connected')}. "
+                "Explicit source only; transcripts may contain conversations, but only allowlisted "
+                "usage metadata stays in memory. No login, hooks or billable prompts.",
+                classes="settings-note",
+                markup=False,
+            )
+            with Horizontal(classes="settings-toggle"):
+                yield Static("Enable " + name + " local usage", markup=False)
+                yield Switch(settings.enabled, id=f"{name}-enabled", disabled=self.demo)
+            candidate = settings.source_root
+            if not candidate and not self.demo:
+                candidate = (
+                    os.environ.get("CODEX_HOME") or str(Path.home() / ".codex")
+                    if name == "codex"
+                    else str(Path.home() / ".kiro" / "sessions")
+                )
+            yield Static("Confirmed source root (not scanned until Save)", classes="settings-label")
+            yield Input(candidate, id=f"{name}-source", disabled=self.demo)
+            yield Static("IANA calendar timezone", classes="settings-label")
+            yield Input(settings.timezone, id=f"{name}-timezone", disabled=self.demo)
+            if isinstance(settings, CodexSettings):
+                with Horizontal(classes="settings-toggle"):
+                    yield Static("Opt in to Codex account-limit reads", markup=False)
+                    yield Switch(
+                        settings.limits_enabled, id="codex-limits-enabled", disabled=self.demo
+                    )
+                yield Static(
+                    "Limits use an owned stdio app-server with read requests only. Codex owns "
+                    "authentication and may update its own state. No thread/turn/login requests. "
+                    "Local tokens and account limits stay separate.",
+                    classes="settings-note",
+                    markup=False,
+                )
+            else:
+                yield Static(
+                    "Observed V3 usage_summary credits only; installed versions alone do not "
+                    "prove support. CLI/SQLite-only formats, token estimates, models and account "
+                    "limits stay unavailable unless a verified record provides them.",
+                    classes="settings-note",
+                    markup=False,
+                )
 
     def _launch(self, coroutine: Coroutine[Any, Any, None], group: str) -> None:
         previous = self._owned.get(group)
@@ -281,10 +414,26 @@ class SettingsScreen(Screen[Config | None]):
             claude_enabled=self.query_one("#claude-enabled", Switch).value,
             claude_source=self.query_one("#claude-source", Input).value,
             claude_timezone=self.query_one("#claude-timezone", Input).value,
+            mail_enabled=self.query_one("#mail-enabled", Switch).value,
+            mailboxes=tuple(
+                self._mail_choices[index]
+                for index in self.query_one("#mail-boxes", SelectionList).selected
+                if type(index) is int and 0 <= index < len(self._mail_choices)
+            ),
+            codex_enabled=self.query_one("#codex-enabled", Switch).value,
+            codex_limits_enabled=self.query_one("#codex-limits-enabled", Switch).value,
+            codex_source=self.query_one("#codex-source", Input).value,
+            codex_timezone=self.query_one("#codex-timezone", Input).value,
+            kiro_enabled=self.query_one("#kiro-enabled", Switch).value,
+            kiro_source=self.query_one("#kiro-source", Input).value,
+            kiro_timezone=self.query_one("#kiro-timezone", Input).value,
+            warp_enabled=self.query_one("#warp-enabled", Switch).value,
+            warp_team_uid=self.query_one("#warp-team", Input).value,
+            warp_key=self.query_one("#warp-key", Input).value,
         )
 
     def _lock_controls(self, locked: bool) -> None:
-        for control in self.query("Input, Switch, Select, Button"):
+        for control in self.query("Input, Switch, Select, SelectionList, Button"):
             control.disabled = locked or self.demo
         self.query_one("#settings-cancel", Button).disabled = locked
         if not locked:
@@ -293,8 +442,8 @@ class SettingsScreen(Screen[Config | None]):
     def action_save(self) -> None:
         if self.demo or self._saving or self.store is None:
             return
-        if self._authorizing:
-            self._message("Calendar authorization is still in progress. Wait or Cancel.")
+        if self._authorizing or self._mail_busy:
+            self._message("Authorization/discovery is still in progress. Wait or Cancel.")
             return
         draft = self._draft()
         try:
@@ -312,6 +461,9 @@ class SettingsScreen(Screen[Config | None]):
         self._lock_controls(True)
         self._message("Saving and applying settings…")
         pending = self._owned.get("location-search")
+        if pending is not None:
+            pending.cancel()
+        pending = self._owned.get("warp-test")
         if pending is not None:
             pending.cancel()
         self._launch(self._save(draft), "settings-save")
@@ -448,6 +600,11 @@ class SettingsScreen(Screen[Config | None]):
             "settings-cancel": self.action_cancel,
             "location-search": self._start_search,
             "calendar-authorize": self._start_authorize,
+            "mail-status-check": lambda: self._start_mail("status"),
+            "mail-authorize": lambda: self._start_mail("authorize"),
+            "mail-discover": lambda: self._start_mail("discover"),
+            "warp-test": self._start_warp_test,
+            "warp-disconnect": self._start_warp_disconnect,
         }
         action = actions.get(event.button.id or "")
         if action is not None:
@@ -460,3 +617,151 @@ class SettingsScreen(Screen[Config | None]):
 
     def on_unmount(self) -> None:
         self._cancel_work()
+        fields = self.query("#warp-key")
+        if fields:
+            fields.first(Input).value = ""
+
+    def _start_mail(self, operation: str) -> None:
+        if self.demo or self._saving or self._mail_busy or self.paths is None:
+            return
+        self._mail_busy = True
+        self.query_one("#mail-status", Static).update("Checking explicit Mail action…")
+        for identifier in ("mail-status-check", "mail-authorize", "mail-discover"):
+            self.query_one(f"#{identifier}", Button).disabled = True
+        self._launch(self._mail_action(operation), "mail-action")
+
+    async def _mail_action(self, operation: str) -> None:
+        assert self.paths is not None
+        try:
+            if operation == "discover":
+                found = await discover_mailboxes(self.paths)
+                selected = {
+                    (self._mail_choices[index].account_id, self._mail_choices[index].mailbox_path)
+                    for index in self.query_one("#mail-boxes", SelectionList).selected
+                    if type(index) is int and 0 <= index < len(self._mail_choices)
+                }
+                if self.is_mounted and not self._saving:
+                    merged = {
+                        (box.account_id, box.mailbox_path): box
+                        for box in (*self._mail_choices, *found)
+                    }
+                    choices = tuple(merged.values())[:205]
+                    self._mail_choices = choices
+                    widget = self.query_one("#mail-boxes", SelectionList)
+                    widget.clear_options()
+                    widget.add_options(
+                        [
+                            (
+                                Text(self._mail_label(box)),
+                                index,
+                                (box.account_id, box.mailbox_path) in selected,
+                            )
+                            for index, box in enumerate(choices)
+                        ]
+                    )
+                    self.query_one("#mail-status", Static).update(
+                        "Bounded discovery complete. Select up to five mailboxes, enable and Save. "
+                        "The list is sampled and may not contain every mailbox."
+                    )
+            else:
+                result = await (
+                    authorize_mail(self.paths)
+                    if operation == "authorize"
+                    else mail_status(self.paths)
+                )
+                labels = {
+                    "authorized": "Mail authorized. Discover/select mailboxes, then Save.",
+                    "not_running": "Mail is closed. Open it yourself, then authorize/discover.",
+                    "not_determined": "Use Authorize Mail Automation to request permission.",
+                    "denied": "Mail Automation denied. Review host privacy permissions.",
+                    "restricted": "Mail Automation restricted by macOS.",
+                    "setup_required": "Mail helper not built. Use explicit Authorize to build it.",
+                }
+                if self.is_mounted:
+                    state = result.get("status")
+                    self.query_one("#mail-status", Static).update(
+                        labels.get(state, "Mail helper unavailable or unsupported.")
+                        if isinstance(state, str)
+                        else "Mail helper unavailable or unsupported."
+                    )
+        except Exception:
+            if self.is_mounted:
+                self.query_one("#mail-status", Static).update(
+                    "Mail action unavailable. Open Mail, authorize, then retry discovery."
+                )
+        finally:
+            self._mail_busy = False
+            if self.is_mounted:
+                for identifier in ("mail-status-check", "mail-authorize", "mail-discover"):
+                    self.query_one(f"#{identifier}", Button).disabled = self.demo or self._saving
+
+    def _start_warp_test(self) -> None:
+        if self.demo or self._saving:
+            return
+        self._launch(self._test_warp(), "warp-test")
+
+    async def _test_warp(self) -> None:
+        pending_key = self.query_one("#warp-key", Input).value
+        pending_team = self.query_one("#warp-team", Input).value.strip()
+        try:
+            settings = replace(
+                self.config.warp,
+                enabled=True,
+                team_uid=pending_team,
+            )
+            provider = WarpProvider(
+                settings, credential=(lambda: pending_key) if pending_key else None
+            )
+            await provider.collect()
+            if self.is_mounted and not self._saving:
+                self.query_one("#warp-status", Static).update(
+                    "Read-only test succeeded. No preferences/key saved; enable and Save to apply."
+                    if pending_key == self.query_one("#warp-key", Input).value
+                    and pending_team == self.query_one("#warp-team", Input).value.strip()
+                    else "Draft changed; test result discarded. Test again."
+                )
+        except Exception:
+            if self.is_mounted and not self._saving:
+                self.query_one("#warp-status", Static).update(
+                    "Warp test failed. Check the key, Keychain, network and selected team scope."
+                )
+
+    def _start_warp_disconnect(self) -> None:
+        if self.demo or self._saving:
+            return
+        self.app.push_screen(ConfirmWarpDisconnect(), self._confirmed_disconnect)
+
+    def _confirmed_disconnect(self, result: bool | None) -> None:
+        if not result or self.store is None:
+            return
+        self._saving = True
+        self._lock_controls(True)
+        self._cancel_work()
+        self._launch(self._disconnect_warp(), "warp-disconnect")
+
+    async def _disconnect_warp(self) -> None:
+        assert self.store is not None
+        try:
+            disabled = await asyncio.to_thread(disable_warp, self.store, self.config)
+        except Exception:
+            self._saving = False
+            self._lock_controls(False)
+            self._message(
+                "Cannot disable Warp. Check preferences; no credential deletion was confirmed."
+            )
+            return
+        scheduler = getattr(self.app, "scheduler", None)
+        if isinstance(scheduler, Scheduler):
+            for provider in scheduler.registry.all():
+                if provider.spec.key.provider == "warp-runs":
+                    await scheduler.stop_source(provider.spec.key)
+        try:
+            config, complete = await asyncio.to_thread(disconnect_warp, self.store, disabled)
+        except Exception:
+            config, complete = disabled, False
+        if not complete:
+            self.notify(
+                "Warp disabled. Keychain cleanup incomplete; unlock Keychain and retry Disconnect.",
+                severity="warning",
+            )
+        self.dismiss(config)

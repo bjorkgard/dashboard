@@ -23,6 +23,10 @@ the existing live sources. v0.3.0 retains the single overview.
 **New in v0.5.0:** opt-in Claude Code local usage and a fifth AI tab, with
 metadata-only accounting and explicit local-source coverage.
 
+**Unreleased (source checkout):** Apple Mail headers and Inbox (`6`), independent
+Codex/Kiro/Warp-Oz modules, multi-source AI rendering, and recent-first Claude indexing.
+These additions are not in the published v0.5.0 wheel.
+
 ## What works today
 
 - A terminal workspace with a ticking local clock and foundation-preview cards.
@@ -44,9 +48,10 @@ metadata-only accounting and explicit local-source coverage.
   with bounded read-only collection and an in-memory ledger.
 - Unit, headless UI, and real pseudo-terminal startup/shutdown tests.
 
-Account selection/login, Inbox detail tabs, the animated flip clock, GPU/temperature
-graphs, direct Google/Microsoft calendar connections, mail/task providers, GitHub
-issues/notifications/personal review queues, other AI-provider analytics, and the [aapl.io](https://aapl.io) news ticker
+Direct cloud account login, the animated flip clock, GPU/temperature graphs,
+Google/Microsoft calendar connections, direct Gmail/Graph/IMAP and task providers,
+GitHub issues/notifications/personal review queues, additional AI formats/quotas,
+and the [aapl.io](https://aapl.io) news ticker
 are planned work. Calendars already synced with macOS use the OS's existing accounts
 after explicit permission; new cloud-account login is not implemented in this slice.
 
@@ -130,9 +135,12 @@ Dayboard includes five workspace tabs (AI requires v0.5.0+):
   (up to 50 PRs and 25 commits across five repositories); this is not a complete
   account-wide feed or personal review queue.
 - **5 — AI:** Claude Code local usage, calendar-window totals and model summaries,
-  with explicit partial-coverage and indexing indicators.
+  with explicit partial-coverage and indexing indicators. The development checkout
+  adds independent Codex local/limits, Kiro credits and Warp/Oz run sections.
+- **6 — Inbox (development checkout):** bounded Apple Mail header preview.
 
-Press **1–5** or click a tab. **Tab / Shift-Tab** moves focus; **Left / Right**
+Press **1–5** (or **1–6** in the development checkout) or click a tab.
+**Tab / Shift-Tab** moves focus; **Left / Right**
 switches tabs when the tab bar is focused. Focus a scroll region to use arrow keys
 and **Page Up / Page Down**; number shortcuts focus the selected region directly.
 The overview uses one column below 100 terminal columns and two on wider terminals.
@@ -147,8 +155,93 @@ to the selected tab; Save resets old-scope readings in both overview and detail
 views. Number keys remain normal text input in Settings and do not navigate
 underneath onboarding. Tab selection is session-only, not saved as a preference.
 Demo tabs use synthetic data only; no new permissions or credentials are required.
-Inbox detail tabs remain deferred until their live providers exist. v0.5.0 adds
-the opt-in Claude AI tab described below.
+The published v0.5.0 adds the opt-in Claude AI tab described below. New Mail and
+AI modules are currently available only from the development checkout.
+
+### Apple Mail and remaining AI setup (unreleased)
+
+Back up preferences before saving with this checkout: it writes **schema 5**,
+which v0.5.0 and earlier cannot read. New sources are disabled when older preferences
+migrate in memory; existing source choices remain preserved. Open **Settings (`s`)**
+to opt in, then **Save / Ctrl-S** to apply. Cancel discards form edits.
+
+#### Apple Mail
+
+- Uses accounts already configured in macOS Mail, not separate Google/Microsoft/IMAP
+  logins. Open Mail yourself; background collection never launches it.
+- Click **Authorize Mail Automation** explicitly to build the owned helper and request
+  access. Requires macOS 14+ and Swift Command Line Tools. The OS permission is broader
+  than the fixed read-only operations Dayboard performs; Cancel does not revoke a grant.
+- Click **Discover mailboxes**, select up to five, enable Mail and Save.
+  Discovery is bounded to 20 accounts, 200 mailbox entries and eight levels, so it may
+  not show every mailbox. Previously saved selections remain available for deselection.
+- Inbox (`6`) samples up to 20 candidate headers per mailbox and 50 combined, sorted
+  by received date within the sample—not guaranteed globally newest mail. Overview
+  previews five. Sender/subject/date/read state and source labels remain in memory.
+- No bodies, raw source, attachments, password reads, message opening, marking read,
+  deletion, moving or synchronization commands. Closed/denied/unavailable Mail is
+  reported safely; failed collection retains last-good headers marked stale.
+
+#### Codex
+
+- Confirm the Codex root (normally `~/.codex`; `CODEX_HOME` may be offered as a candidate),
+  timezone, and enable local usage. Only `sessions` and `archived_sessions` rollout
+  JSONL are read; credentials, response text and tool arguments are not retained.
+- The tested UUID-session/token-count profile derives event deltas from cumulative
+  counters, handles resets and replay, subtracts cached input from inclusive input,
+  and does not add reasoning on top of output. Missing initial baselines are labelled
+  partial; unknown models and unsupported formats are not guessed. Cache writes stay unknown.
+- **Codex account-limit reads** is a separate opt-in. It uses an owned stdio app-server
+  with initialization and account-rate-limit reads only, about every five minutes.
+  Codex must already be installed and signed in separately. It owns authentication
+  and may maintain its own state; Dayboard never copies its tokens or starts a turn.
+- Multiple limit windows remain separate, with nullable reset/duration values and fresh
+  observation timestamps. Quota failure does not disable local token collection.
+
+#### Kiro
+
+- Confirm a sessions root such as `~/.kiro/sessions`, timezone, and enable.
+- The implemented observed profile is `<workspace-hash>/sess_<uuid>/messages.jsonl`
+  with V3 `usage_summary`/execution IDs and reported credit units. Revisions replace
+  earlier per-execution observations; decimal credits are never inferred from context,
+  token windows, response sizes or message text.
+- Local recorded-credit windows are not account balances. Tokens and model attribution
+  remain unavailable; `session.json` is deliberately not read.
+- CLI-header and SQLite-only formats are unsupported. A CLI version alone does not
+  prove format compatibility: the public example used CLI 2.16.1 `--v3`, while this
+  Mac's researched CLI was 2.31.1 and current web documentation describes 3.x.
+- No auth tables, private ACP commands, chat `/usage` probes, token extraction,
+  billable prompts, login or automatic upgrade.
+
+#### Warp / Oz
+
+- Enter a Dayboard-owned API key in the **masked** field, optionally select a team UID,
+  then use **Test Warp connection** explicitly. Test reads do not save preferences/keys;
+  changing the draft during a test invalidates its result.
+- Enable and Save to store the key in **macOS Keychain only**, with a nonsecret
+  reference in preferences. Opening Settings does not read Keychain or call the API.
+  Locked/unavailable Keychain fails closed; there is no plaintext/env/CLI-token fallback.
+- The transport only sends fixed-host GET requests to the documented Oz run-list API,
+  at most 25 runs per page, about every five minutes. It does not control/start runs,
+  read Warp desktop databases, use private GraphQL, or retain prompts/titles/artifacts.
+- Per-run/conversation tokens, separate inference/compute/platform credits and USD
+  observations may overlap across resumed and parent/child runs. They are **not summed**
+  into account totals. USD may be billed or fallback estimates; API source time can lag.
+  Desktop-wide usage and remaining account credits remain unavailable.
+- A key may have broader permissions than Dayboard uses. Key rotation stages a new
+  credential so failed preference writes do not overwrite the working key. Referenced
+  keys are preserved if a late write failure leaves commit outcome uncertain.
+  Prior Dayboard key references stay bounded for explicit cleanup.
+- Disabling preserves keys. **Disconnect** requires confirmation, saves disabled state,
+  stops the Warp poller before Keychain cleanup, and removes only Dayboard-owned keys.
+  Cleanup failure leaves Warp disabled and references available for retry; unrelated
+  Oz/Warp credentials and provider preferences are unchanged.
+
+All these modules share the existing scheduler/store but render separately. Kiro credits,
+Warp credits/USD, Codex quotas and local token categories are not interchangeable.
+Demo uses synthetic examples without private-source, credential, API or permission access.
+Live authorization and account/source validation remain explicit user actions; automated
+verification uses fixtures, fake Keychain and mocked transports only.
 
 ### Claude Code local usage (v0.5.0+)
 
@@ -186,14 +279,18 @@ deleted source history cannot be recovered. Collection targets five seconds; dir
 rediscovery targets 30 seconds. Initial limits are 5,000 files, eight directory levels,
 20,000 discovery entries, 8 MiB/two seconds of scan work per pass, 1 MiB per JSONL record,
 and 100,000 canonical requests over 30 calendar dates. Large backlogs index incrementally.
+Development indexing prioritizes recent file mtimes within the bounded discovery scope,
+not guaranteed event recency. Claude reserves one bounded recent-tail preview while
+ordered backfill continues; identity reconciliation prevents replay double counting.
+Original-date metadata is separately bounded so old-only history cannot block fresh usage.
 Unfinished directory discovery resumes on the next pass, including within a directory;
 the rediscovery interval starts only after that traversal finishes. An inaccessible
 project does not block readable siblings. At most one directory iterator remains open
 between passes, and cancellation/disable/shutdown closes it.
 Caps, skipped/unsupported records and conflicts produce explicit partial/observed-so-far
 indicators, not claims of complete history. Diagnostics persist for the reader lifetime;
-Save/restart resets them while rebuilding history. Only a successfully scanned empty
-window shows zero; incomplete empty windows remain unknown.
+Save/restart resets them while rebuilding history. Even a successfully scanned window
+without normalized usage remains unknown; zero requires actual recorded evidence.
 
 Disable Claude in Settings and Save to stop reading and clear its in-memory state.
 The source/timezone preferences remain saved; Claude's own logs are never removed.
@@ -404,23 +501,26 @@ Both modules retain their last good in-memory readings on failures and mark them
 stale; persistent offline weather restoration and account-authenticated calendar
 end-to-end verification are not claimed here.
 
-Dayboard v0.5.0 uses configuration schema 4 for Claude preferences.
-Schemas 0/1/2/3 migrate in memory with Claude disabled and are written only on an
-explicit Save/onboarding action. Published v0.4.0 and earlier cannot read schema 4;
-back up preferences before upgrading, and restore a compatible backup before downgrading.
+Published v0.5.0 uses schema 4. The development checkout uses **schema 5** for Mail
+and additional AI preferences. Schemas 0–4 migrate in memory with new sources disabled;
+existing integrations are preserved. Saving/onboarding writes schema 5, which published
+v0.5.0 and earlier cannot read. Back up preferences before using the checkout and restore
+a compatible backup before downgrading. Package version remains 0.5.0 pending a separate release.
 
 ### Remaining development roadmap
 
 1. Extend workspace detail views as new providers arrive; Overview/Schedule/Mac/GitHub
    tabs shipped in v0.4.0, and Settings shipped in v0.3.0.
 2. Expand calendar providers with ICS/CalDAV and Google/Microsoft authorization.
-3. Add Apple Reminders/Mail, Google Tasks/Gmail, Microsoft To Do/mail, and IMAP.
+3. Add Apple Reminders, Google Tasks/Gmail, Microsoft To Do/Graph mail and IMAP;
+   Apple Mail header sampling is implemented in the development checkout.
 4. Expand baseline Mac metrics with disk/battery/process views, then capability-checked
    GPU/temperature/fan/power readings.
 5. Expand GitHub status with personal review queues/issues/notifications and local
    repository monitoring; open-PR/default-branch commit previews are now implemented.
-6. Extend AI analytics: Claude local usage shipped in v0.5.0;
-   Codex/Kiro/Warp, durable usage storage, quotas and pricing remain planned.
+6. Extend AI analytics: Codex, observed-format Kiro credits and Oz run previews are
+   implemented in the checkout; broader formats, durable history, account-wide Kiro/Warp
+   limits and pricing estimates remain follow-ups. Claude shipped in v0.5.0.
 7. Add the clickable aapl.io ticker, animated flip clock, responsive detail views,
    reduced-motion options and resource/performance hardening.
 
@@ -429,6 +529,7 @@ back up preferences before upgrading, and restore a compatible backup before dow
 - **q** — quit from any workspace tab; in Settings, cancel when not editing text.
 - **1 / 2 / 3 / 4** — Overview / Schedule / Mac / GitHub (v0.4.0+).
 - **5** — AI / Claude local usage (v0.5.0+).
+- **6** — Inbox / Apple Mail headers (development checkout).
 - **Left / Right** — switch tabs when the tab bar is focused (v0.4.0+).
 - **s** — open Settings (read-only in demo mode).
 - **Ctrl-S** — save and apply Settings without exiting the dashboard.

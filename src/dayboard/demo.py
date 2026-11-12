@@ -13,6 +13,10 @@ PANELS: tuple[tuple[str, str, Capability], ...] = (
     ("github", "GITHUB ATTENTION", Capability.GITHUB),
     ("ai", "AI ACTIVITY", Capability.AI),
     ("weather", "OUTSIDE", Capability.WEATHER),
+    ("codex", "CODEX", Capability.AI),
+    ("codex-limits", "CODEX LIMITS", Capability.AI),
+    ("kiro", "KIRO", Capability.AI),
+    ("warp", "WARP / OZ", Capability.AI),
 )
 
 
@@ -58,6 +62,24 @@ class SampleProvider:
             "weather": (
                 Metric("temperature", "Temperature", 12, "°C"),
                 Metric("conditions", "Conditions", "Partly cloudy · Sample location"),
+            ),
+            "codex": (
+                Metric("coverage", "Coverage", "Synthetic local Codex example"),
+                Metric("today-output", "1d output", 1200, "tokens"),
+            ),
+            "codex-limits": (
+                Metric("coverage", "Coverage", "Synthetic quota observation, not token usage"),
+                Metric("window", "Example window", "25% used · reset unavailable"),
+            ),
+            "kiro": (
+                Metric("coverage", "Coverage", "Synthetic recorded credits, no account limits"),
+                Metric("today-credits", "1d recorded Kiro credits", "0.125", "Kiro credits"),
+            ),
+            "warp": (
+                Metric(
+                    "scope", "Scope", "Synthetic overlapping Oz run preview, not account totals"
+                ),
+                Metric("run", "Example run", "SUCCEEDED · tokens unknown"),
             ),
         }
         now = datetime.now(UTC)

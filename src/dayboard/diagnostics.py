@@ -19,7 +19,7 @@ def diagnose(paths: AppPaths) -> tuple[dict[str, str | int | bool], bool]:
         "keychain_backend": "unavailable",
         "keychain_access": "not tested (no credentials read)",
         "live_integrations": (
-            "local CPU/RAM/network; calendar/weather/GitHub/Claude are explicit opt-in"
+            "local CPU/RAM/network; Calendar/weather/GitHub/Mail/Claude/Codex/Kiro/Warp are opt-in"
         ),
         "github_enabled": False,
         "github_repository_count": 0,
@@ -28,6 +28,13 @@ def diagnose(paths: AppPaths) -> tuple[dict[str, str | int | bool], bool]:
         "weather_enabled": False,
         "claude_enabled": False,
         "claude_source_access": "not tested (no source files read)",
+        "mail_enabled": False,
+        "mail_mailbox_count": 0,
+        "codex_enabled": False,
+        "codex_limits_enabled": False,
+        "kiro_enabled": False,
+        "warp_enabled": False,
+        "new_provider_access": "not tested (no mail/session/credential/API reads)",
     }
     healthy = True
     try:
@@ -41,6 +48,12 @@ def diagnose(paths: AppPaths) -> tuple[dict[str, str | int | bool], bool]:
             report["github_enabled"] = config.github.enabled
             report["github_repository_count"] = len(config.github.repositories)
             report["claude_enabled"] = config.claude.enabled
+            report["mail_enabled"] = config.mail.enabled
+            report["mail_mailbox_count"] = len(config.mail.mailboxes)
+            report["codex_enabled"] = config.codex.enabled
+            report["codex_limits_enabled"] = config.codex.limits_enabled
+            report["kiro_enabled"] = config.kiro.enabled
+            report["warp_enabled"] = config.warp.enabled
     except ConfigError:
         report["configuration"] = "invalid"
         healthy = False

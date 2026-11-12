@@ -6,7 +6,40 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+- Opt-in Apple Mail header sampling, explicit Automation authorization and bounded
+  mailbox discovery, with Inbox (`6`) and compact overview previews.
+- Codex local rollout accounting and independent optional stdio account-limit reads;
+  cumulative deltas preserve cached-input/reasoning subset semantics.
+- Observed-format Kiro V3 recorded-credit collection, with exact decimal amounts and
+  explicit unsupported/session-only states rather than inferred tokens or account limits.
+- Documented fixed-host Warp/Oz run previews with masked Dayboard-owned Keychain setup,
+  explicit connection testing and confirmed scoped credential removal.
+- Independent per-provider AI views/statuses, synthetic multi-source demo, safe diagnostics,
+  source-layout-aware bounded readers and expanded installed-package smoke checks.
+
+### Fixed
+
+- Recent-first bounded file selection and a reserved Claude recent-tail preview during
+  ordered backfill, with original-date reconciliation across retention boundaries.
+- Historical identity metadata cannot consume active usage capacity; empty unsupported
+  windows remain unknown and actual recorded zero remains valid.
+- In-flight mailbox edits and changed Warp drafts cannot be overwritten or falsely
+  certified by late results. Warp overlap/account-scope warnings remain visible.
+- Credential staging reconciles late config commit failures before rollback, and explicit
+  Warp disconnect stops polling before potentially slow Keychain cleanup.
+
+### Compatibility and scope
+
+- Schema 5 migrates schemas 0–4 in memory with new sources off and prior choices preserved.
+  Explicit Save writes schema 5; published v0.5.0 and earlier cannot read it.
+- Mail is a bounded candidate-header preview, not a globally newest inbox or direct
+  Gmail/Graph/IMAP client. Permission grants can exceed the app's read-only operations.
+- Kiro support is format-specific, without SQLite/auth access, token estimates or quota probes.
+  Warp run usage can overlap across conversations and is not a desktop/account total.
+- No persistent private history, real permission/account access during tests, automatic
+  login, inference requests, version bump or installation changes.
 
 ## [0.5.0] - 2026-11-12
 

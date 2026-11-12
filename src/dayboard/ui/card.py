@@ -14,6 +14,8 @@ class SnapshotCard(Static):
 
     def visible_metrics(self, snapshot: Snapshot) -> tuple[Metric, ...]:
         limits = {"event-": 6} if self.panel == "schedule" else {}
+        if self.panel == "inbox":
+            limits = {"mail-": 5}
         if self.panel == "github":
             limits = {"pr-": 5, "commit-": 5}
         counts = dict.fromkeys(limits, 0)

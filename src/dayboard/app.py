@@ -16,7 +16,7 @@ from dayboard.core.scheduler import Scheduler
 from dayboard.core.store import SnapshotStore
 from dayboard.integrations.runtime import build_live_registry
 from dayboard.paths import AppPaths
-from dayboard.ui.ai import AICard, AIDetailCard
+from dayboard.ui.ai import AI_PANELS, AICard, AIDetailCard
 from dayboard.ui.card import SnapshotCard
 from dayboard.ui.details import DetailCard
 from dayboard.ui.settings import SettingsScreen
@@ -45,6 +45,7 @@ class DayboardApp(App[None]):
         Binding("3", "workspace('mac')", "Mac", show=False),
         Binding("4", "workspace('github')", "GitHub", show=False),
         Binding("5", "workspace('ai')", "AI", show=False),
+        Binding("6", "workspace('inbox')", "Inbox", show=False),
     ]
 
     def __init__(self, *, demo: bool = False, paths: AppPaths | None = None) -> None:
@@ -105,8 +106,8 @@ class DayboardApp(App[None]):
                     )
                     yield Static(
                         "Local CPU/RAM/network are live. Calendar/weather/GitHub are opt-in. "
-                        "Claude local usage is opt-in. Mail, other AI integrations and "
-                        "flip-clock animation remain on the roadmap.",
+                        "Mail and AI sources are opt-in. "
+                        "News and flip-clock animation remain planned.",
                         id="scope",
                         markup=False,
                     )
@@ -148,21 +149,33 @@ class DayboardApp(App[None]):
             with TabPane("5 AI", id="ai"):
                 with VerticalScroll(id="ai-scroll", classes="workspace-scroll"):
                     yield Static(
-                        "AI / Claude Code selected local source · partial account coverage\n"
-                        "Today / 7 / 30 calendar days in the saved timezone. Source check time "
-                        "is separate from latest usage activity. History is memory-only; "
-                        "restart/Save reindexes. Costs and account quotas are unavailable.",
+                        "AI / Independent source coverage and units\n"
+                        "Local usage, Codex account limits and Oz run previews are different data. "
+                        "No combined credit/token total. "
+                        "Missing or unsupported values stay unknown. "
+                        "Local history is memory-only; Save/restart reindexes.",
                         classes="detail-note",
                         markup=False,
                     )
-                    yield AIDetailCard("ai-detail", "CLAUDE CODE USAGE")
+                    for _, panel, name, _ in AI_PANELS:
+                        yield AIDetailCard(panel, f"{name.upper()} USAGE")
+            with TabPane("6 Inbox", id="inbox"):
+                with VerticalScroll(id="inbox-scroll", classes="workspace-scroll"):
+                    yield Static(
+                        "INBOX / Apple Mail header preview\n"
+                        "Read-only selected mailboxes. Bounded candidates, not a guarantee of "
+                        "globally newest mail. No bodies, attachments, opening or marking read.",
+                        classes="detail-note",
+                        markup=False,
+                    )
+                    yield DetailCard("inbox-detail", "MAIL HEADER PREVIEW")
         yield Footer()
 
     def action_workspace(self, pane: str) -> None:
         # Never navigate underneath Settings/onboarding or consume their text input.
         if self.screen is not self.screen_stack[0] or self._applying_settings:
             return
-        if pane not in ("overview", "schedule", "mac", "github", "ai"):
+        if pane not in ("overview", "schedule", "mac", "github", "ai", "inbox"):
             return
         self.query_one("#workspace-tabs", TabbedContent).active = pane
         scroll = "workspace" if pane == "overview" else f"{pane}-scroll"
@@ -191,6 +204,8 @@ class DayboardApp(App[None]):
     def action_settings(self) -> None:
         if self._applying_settings or isinstance(self.screen, SettingsScreen):
             return
+        if self.screen is not self.screen_stack[0] and not isinstance(self.screen, WelcomeScreen):
+            return
         config = self.config
         if not self.demo and self.config_store is not None:
             try:
@@ -218,7 +233,7 @@ class DayboardApp(App[None]):
             ("weather", Capability.WEATHER),
             ("calendar", Capability.CALENDAR),
             ("github", Capability.GITHUB),
-            ("claude", Capability.AI),
+            ("mail", Capability.MAIL),
         ):
             provider = next(
                 (p for p in self.registry.all() if capability in p.spec.capabilities),
@@ -231,6 +246,26 @@ class DayboardApp(App[None]):
                     provider.spec.key, stale_after=provider.spec.interval_seconds * 2
                 )
                 result[name] = status.state.value + (
+                    f" · {status.error.value}" if status.error else ""
+                )
+        for provider_id, _, _name, _ in AI_PANELS:
+            provider = next(
+                (p for p in self.registry.all() if p.spec.key.provider == provider_id), None
+            )
+            label = {
+                "claude-local": "claude",
+                "codex-local": "codex",
+                "codex-limits": "codex-limits",
+                "kiro-local": "kiro",
+                "warp-runs": "warp",
+            }[provider_id]
+            if provider is None:
+                result[label] = "not connected"
+            else:
+                status = self.store.status(
+                    provider.spec.key, stale_after=provider.spec.interval_seconds * 2
+                )
+                result[label] = status.state.value + (
                     f" · {status.error.value}" if status.error else ""
                 )
         return result
@@ -285,8 +320,11 @@ class DayboardApp(App[None]):
             now.strftime("%H:%M:%S") + "\n" + now.strftime("%A, %B %d  ·  %Z")
         )
         for panel, _, capability in PANELS:
+            if panel == "ai":
+                self._refresh_ai()
+                continue
             cards = [base.query_one(f"#card-{panel}", SnapshotCard)]
-            if panel in ("schedule", "mac", "github", "ai"):
+            if panel in ("schedule", "mac", "github", "inbox"):
                 cards.append(base.query_one(f"#card-{panel}-detail", SnapshotCard))
             if panel == "mac" and not self.demo:
                 cards.append(base.query_one("#card-mac-metrics", SnapshotCard))
@@ -315,13 +353,33 @@ class DayboardApp(App[None]):
                         loading=provider is not None and status.attempted_at is None,
                     )
 
+    def _refresh_ai(self) -> None:
+        base = self.screen_stack[0]
+        sources = []
+        for provider_id, panel, name, demo_id in AI_PANELS:
+            key = demo_id if self.demo else provider_id
+            provider = next((p for p in self.registry.all() if p.spec.key.provider == key), None)
+            status = (
+                self.store.status(provider.spec.key, stale_after=provider.spec.interval_seconds * 2)
+                if provider
+                else SourceStatus(ConnectionState.DISCONNECTED)
+            )
+            base.query_one(f"#card-{panel}", SnapshotCard).show_snapshot(
+                status.snapshot,
+                state=status.state.value,
+                error=status.error,
+                loading=provider is not None and status.attempted_at is None,
+            )
+            sources.append((name, status, provider is not None))
+        base.query_one("#card-ai", AICard).show_sources(sources)
+
     async def action_quit(self) -> None:
         await self.scheduler.close()
         self.exit()
 
     def action_help(self) -> None:
         self.notify(
-            "1–5: Overview / Schedule / Mac / GitHub / AI · q: Quit · s: Settings · "
+            "1–6: Overview / Schedule / Mac / GitHub / AI / Inbox · q: Quit · s: Settings · "
             "Tab/Shift-Tab: Focus · Left/Right on tabs: Switch · Arrows/Page Down: Scroll · "
             "Ctrl-S: Save / Esc: Cancel in Settings · "
             "uv run dayboard doctor: Safe diagnostics.",

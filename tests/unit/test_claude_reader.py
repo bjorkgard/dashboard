@@ -166,11 +166,11 @@ async def test_discovery_depth_and_entry_caps_do_not_claim_an_empty_complete_sca
         assert next(m.value for m in result.metrics if m.id == "today-input") is None
 
 
-async def test_empty_supported_source_is_zero_and_source_check_time_is_fresh(source):
+async def test_empty_source_usage_is_unknown_and_source_check_time_is_fresh(source):
     root, path = source
     path.write_text('{"type":"user","message":"PRIVATE_PROMPT_CANARY"}\n')
     result = await ClaudeProvider(ClaudeSettings(True, str(root))).collect()
-    assert next(m.value for m in result.metrics if m.id == "today-input") == 0
+    assert next(m.value for m in result.metrics if m.id == "today-input") is None
     assert next(m.value for m in result.metrics if m.id == "activity") is None
     assert abs((datetime.now(UTC) - result.observed_at).total_seconds()) < 5
 

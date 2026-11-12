@@ -27,9 +27,17 @@ class ConnectionState(StrEnum):
 
 class ErrorCode(StrEnum):
     AI_SOURCE_UNAVAILABLE = (
-        "Claude source unavailable or unsafe; choose an owned directory in Settings"
+        "Local AI source unavailable or unsafe; choose an owned directory in Settings"
     )
-    AI_PERMISSION_DENIED = "Claude source access denied; review source permissions"
+    AI_PERMISSION_DENIED = "Local AI source access denied; review source permissions"
+    AI_UNSUPPORTED = "Source format or requested usage metric is unsupported"
+    MAIL_PERMISSION_REQUIRED = "Authorize Mail Automation explicitly in Settings"
+    MAIL_PERMISSION_DENIED = "Mail Automation denied; review macOS privacy permissions"
+    MAIL_UNAVAILABLE = "Mail unavailable; open Mail explicitly and check selected mailboxes"
+    MAIL_SETUP_REQUIRED = "Configure Mail explicitly in Settings"
+    CODEX_SETUP_REQUIRED = "Codex limits unavailable; install Codex and sign in separately"
+    WARP_AUTH_REQUIRED = "Warp API key unavailable; configure Dayboard Keychain credentials"
+    WARP_UNAVAILABLE = "Warp run usage unavailable; check connection and selected scope"
     GITHUB_SETUP_REQUIRED = (
         "GitHub unavailable; install gh, run gh auth login, and check repository access"
     )

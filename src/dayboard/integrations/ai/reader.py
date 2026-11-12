@@ -3,16 +3,20 @@
 Raw lines exist only inside a worker pass. Cursors never retain conversation bytes.
 """
 
+from __future__ import annotations
+
 import hashlib
+import heapq
 import json
 import os
 import stat
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from decimal import Decimal, DecimalException
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from dayboard.core.ai_usage import UsageRecord
 from dayboard.core.models import ErrorCode
@@ -33,7 +37,7 @@ def _owned(fd: int, *, directory: bool) -> os.stat_result:
     return info
 
 
-def _projects(root: str) -> int:
+def _projects(root: str, subtree: tuple[str, ...] = ("projects",)) -> int:
     path = Path(root)
     if not path.is_absolute() or ".." in path.parts:
         raise OSError("Unsafe source.")
@@ -44,20 +48,21 @@ def _projects(root: str) -> int:
             os.close(fd)
             fd = child
         _owned(fd, directory=True)
-        child = os.open("projects", _DIR, dir_fd=fd)
-        try:
-            _owned(child, directory=True)
-        except BaseException:
-            os.close(child)
-            raise
-        return child
+        for part in subtree:
+            if not part or part in (".", "..") or "/" in part or "\x00" in part:
+                raise OSError("Unsafe source layout.")
+            child = os.open(part, _DIR, dir_fd=fd)
+            os.close(fd)
+            fd = child
+            _owned(fd, directory=True)
+        return os.dup(fd)
     finally:
         os.close(fd)
 
 
-def validate_source(root: str) -> None:
+def validate_source(root: str, *, subtree: tuple[str, ...] = ("projects",)) -> None:
     try:
-        os.close(_projects(root))
+        os.close(_projects(root, subtree))
     except PermissionError:
         raise ProviderUnavailable(ErrorCode.AI_PERMISSION_DENIED) from None
     except OSError:
@@ -97,6 +102,13 @@ class _DirectoryEntries(Protocol):
     def close(self) -> None: ...
 
 
+class _ReaderLimits(Protocol):
+    max_entries: int
+    max_depth: int
+    max_files: int
+    accept_file: Callable[[tuple[str, ...]], bool]
+
+
 class _Discovery:
     """One bounded discovery generation, owning at most one open directory iterator."""
 
@@ -105,14 +117,24 @@ class _Discovery:
         self.queue: list[tuple[str, ...]] = [()]
         self.current: tuple[str, ...] = ()
         self.iterator: _DirectoryEntries | None = None
-        self.files: list[tuple[str, ...]] = []
+        self.directory_fd: int | None = None
+        self.candidates: list[tuple[int, tuple[str, ...]]] = []
         self.entries = 0
         self.complete = False
 
+    @property
+    def files(self) -> list[tuple[str, ...]]:
+        return [parts for _, parts in sorted(self.candidates, reverse=True)]
+
     def close(self) -> None:
-        if self.iterator is not None:
-            self.iterator.close()
-            self.iterator = None
+        iterator, self.iterator = self.iterator, None
+        fd, self.directory_fd = self.directory_fd, None
+        try:
+            if iterator is not None:
+                iterator.close()
+        finally:
+            if fd is not None:
+                os.close(fd)
 
     def __del__(self) -> None:
         self.close()
@@ -120,7 +142,7 @@ class _Discovery:
     def advance(
         self,
         root_fd: int,
-        reader: "ClaudeReader",
+        reader: _ReaderLimits,
         check: Callable[[], None],
         issues: set[str],
     ) -> None:
@@ -133,11 +155,12 @@ class _Discovery:
                 try:
                     fd = _open_relative(root_fd, self.current, directory=True)
                     self.iterator = os.scandir(fd)
+                    self.directory_fd = fd
                 except OSError:
                     issues.add("unreadable directory skipped")
                     continue
                 finally:
-                    if fd >= 0:
+                    if fd >= 0 and self.directory_fd != fd:
                         os.close(fd)
             try:
                 entry = next(self.iterator)
@@ -163,11 +186,14 @@ class _Discovery:
                         self.queue.append(relative)
                     else:
                         issues.add("depth cap")
-                elif entry.name.endswith(".jsonl"):
-                    if len(self.files) < reader.max_files:
-                        self.files.append(relative)
+                elif reader.accept_file(relative):
+                    candidate = (entry.stat(follow_symlinks=False).st_mtime_ns, relative)
+                    if len(self.candidates) < reader.max_files:
+                        heapq.heappush(self.candidates, candidate)
                     else:
                         issues.add("file cap")
+                        if candidate > self.candidates[0]:
+                            heapq.heapreplace(self.candidates, candidate)
             except OSError:
                 issues.add("unreadable entry skipped")
         self.complete = True
@@ -183,8 +209,8 @@ class Cursor:
 
 
 @dataclass(frozen=True)
-class ScanBatch:
-    records: tuple[UsageRecord, ...]
+class ScanBatch[T]:
+    records: tuple[T, ...]
     files: tuple[tuple[str, ...], ...]
     cursors: dict[tuple[str, ...], Cursor]
     issues: frozenset[str]
@@ -192,17 +218,21 @@ class ScanBatch:
     discovered_at: float
     next_file: int
     discovery: _Discovery | None = None
+    previewed_files: frozenset[tuple[str, ...]] = frozenset()
 
     def close(self) -> None:
         if self.discovery is not None:
             self.discovery.close()
 
 
-class ClaudeReader:
+class LocalReader[T]:
     def __init__(
         self,
         root: str,
         *,
+        parser: Callable[[Any, tuple[str, ...], int], T | None],
+        subtree: tuple[str, ...] = (),
+        accept_file: Callable[[tuple[str, ...]], bool] = lambda path: path[-1].endswith(".jsonl"),
         max_files: int = 5000,
         max_depth: int = 8,
         max_entries: int = 20_000,
@@ -219,8 +249,9 @@ class ClaudeReader:
             and byte_budget >= max_record + 256
             and 0 < seconds <= 2
         ):
-            raise ValueError("Invalid Claude reader budgets.")
+            raise ValueError("Invalid local reader budgets.")
         self.root = root
+        self.parser, self.subtree, self.accept_file = parser, subtree, accept_file
         self.max_files, self.max_depth, self.max_entries = max_files, max_depth, max_entries
         self.byte_budget, self.max_record, self.seconds = byte_budget, max_record, seconds
         self.files: tuple[tuple[str, ...], ...] = ()
@@ -229,23 +260,34 @@ class ClaudeReader:
         self.discovered_at = float("-inf")
         self.next_file = 0
         self._discovery: _Discovery | None = None
+        self.previewed_files: frozenset[tuple[str, ...]] = frozenset()
 
     def close(self) -> None:
         if self._discovery is not None:
             self._discovery.close()
             self._discovery = None
 
-    def commit(self, batch: ScanBatch) -> None:
+    def commit(self, batch: ScanBatch[T]) -> None:
         self.close()
         self.files, self.cursors, self.issues = batch.files, batch.cursors, batch.issues
         self.discovered_at, self.next_file = batch.discovered_at, batch.next_file
         self._discovery = batch.discovery
+        self.previewed_files = batch.previewed_files
 
-    def scan(self, stop: threading.Event) -> ScanBatch:
-        deadline = time.monotonic() + self.seconds
-        remaining = self.byte_budget
+    def scan(self, stop: threading.Event) -> ScanBatch[T]:
+        return self._scan(stop)
+
+    def _scan(
+        self,
+        stop: threading.Event,
+        *,
+        reserve_bytes: int = 0,
+        seconds: float | None = None,
+    ) -> ScanBatch[T]:
+        deadline = time.monotonic() + (self.seconds if seconds is None else seconds)
+        remaining = self.byte_budget - reserve_bytes
         issues = set(self.issues)
-        records: list[UsageRecord] = []
+        records: list[T] = []
 
         def check() -> None:
             if stop.is_set():
@@ -264,7 +306,7 @@ class ClaudeReader:
             return data
 
         try:
-            root_fd = _projects(self.root)
+            root_fd = _projects(self.root, self.subtree)
         except PermissionError:
             self.close()
             raise ProviderUnavailable(ErrorCode.AI_PERMISSION_DENIED) from None
@@ -295,7 +337,7 @@ class ClaudeReader:
                     discovery = None
                 else:
                     # Keep known files/cursors usable while the next generation is incomplete.
-                    files = list(dict.fromkeys((*files, *discovery.files)))[: self.max_files]
+                    files = list(dict.fromkeys((*discovery.files, *files)))[: self.max_files]
             file_set = set(files)
             cursors = {key: value for key, value in self.cursors.items() if key in file_set}
             next_file = self.next_file % max(1, len(files))
@@ -348,10 +390,17 @@ class ClaudeReader:
                             if end >= 0:
                                 if not skipping and buffer:
                                     try:
-                                        item = parse_usage(json.loads(buffer))
+                                        item = self.parser(
+                                            json.loads(buffer, parse_float=Decimal), parts, start
+                                        )
                                         if item is not None:
                                             records.append(item)
-                                    except (ValueError, UnicodeError, RecursionError):
+                                    except (
+                                        ValueError,
+                                        UnicodeError,
+                                        RecursionError,
+                                        DecimalException,
+                                    ):
                                         issues.add("unsupported or malformed record skipped")
                                 buffer.clear()
                                 skipping = False
@@ -394,6 +443,7 @@ class ClaudeReader:
                 discovered_at,
                 next_file,
                 discovery,
+                frozenset(self.previewed_files.intersection(file_set)),
             )
         except BaseException:
             if discovery is not None:
@@ -401,3 +451,86 @@ class ClaudeReader:
             raise
         finally:
             os.close(root_fd)
+
+
+class ClaudeReader(LocalReader[UsageRecord]):
+    def __init__(self, root: str, **kwargs: Any) -> None:
+        super().__init__(
+            root,
+            parser=lambda data, path, offset: parse_usage(data),
+            subtree=("projects",),
+            **kwargs,
+        )
+
+    def scan(self, stop: threading.Event) -> ScanBatch[UsageRecord]:
+        deadline = time.monotonic() + self.seconds
+        needs_preview = not self.files or any(
+            path not in self.previewed_files for path in self.files
+        )
+        reserve = (
+            min(262144, max(0, self.byte_budget - self.max_record - 256)) if needs_preview else 0
+        )
+        batch = self._scan(
+            stop,
+            reserve_bytes=reserve,
+            seconds=self.seconds * 0.75 if reserve else None,
+        )
+        if not reserve:
+            return batch
+        previewed = set(batch.previewed_files)
+        records: list[UsageRecord] = []
+        issues = set(batch.issues)
+        root_fd = -1
+        try:
+            for parts in batch.files:
+                if stop.is_set():
+                    raise ScanCancelled()
+                if time.monotonic() >= deadline:
+                    break
+                if parts in previewed:
+                    continue
+                if root_fd < 0:
+                    root_fd = _projects(self.root, self.subtree)
+                fd = -1
+                try:
+                    fd = _open_relative(root_fd, parts)
+                    info = _owned(fd, directory=False)
+                    if info.st_size > reserve:
+                        start = info.st_size - reserve
+                        data = os.pread(fd, reserve, start)
+                        first = data.find(b"\n")
+                        if first >= 0:
+                            start += first + 1
+                            for line in data[first + 1 :].splitlines(keepends=True):
+                                if stop.is_set():
+                                    raise ScanCancelled()
+                                if time.monotonic() >= deadline:
+                                    break
+                                if line.endswith(b"\n") and len(line) <= self.max_record:
+                                    try:
+                                        record = self.parser(json.loads(line), parts, start)
+                                        if record is not None:
+                                            records.append(record)
+                                    except (ValueError, UnicodeError, RecursionError):
+                                        issues.add("recent-preview record skipped")
+                                start += len(line)
+                        previewed.add(parts)
+                        break  # One reserved byte window per collection pass.
+                    previewed.add(parts)
+                except OSError:
+                    issues.add("recent-preview source unavailable")
+                finally:
+                    if fd >= 0:
+                        os.close(fd)
+            return replace(
+                batch,
+                records=(*records, *batch.records),
+                issues=frozenset(issues),
+                previewed_files=frozenset(previewed),
+            )
+        except BaseException:
+            batch.close()
+            raise
+        finally:
+            if root_fd >= 0:
+                os.close(root_fd)

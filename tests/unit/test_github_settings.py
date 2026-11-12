@@ -9,7 +9,7 @@ from dayboard.settings import GitHubSettings
 
 def test_github_is_disabled_until_repositories_are_selected():
     assert not Config().github.enabled
-    assert Config().schema_version == 4
+    assert Config().schema_version == 5
     assert Config().github.repositories == ()
 
 
@@ -49,7 +49,7 @@ def test_schema_two_preserves_existing_integrations_without_enabling_github():
             "calendar": {"enabled": True},
         }
     )
-    assert config.schema_version == 4
+    assert config.schema_version == 5
     assert config.weather.enabled
     assert config.calendar.enabled
     assert not config.github.enabled

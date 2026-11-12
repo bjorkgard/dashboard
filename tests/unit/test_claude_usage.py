@@ -150,3 +150,29 @@ def test_dst_fall_back_hours_are_one_calendar_day_not_two():
     ledger.add(first, now)
     ledger.add(second, now)
     assert ledger.summary(now, 1).requests == 2
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_original_outside_retention_prevents_revision_reattribution(reverse):
+    ledger = UsageLedger()
+    original = replace(parsed(), timestamp=datetime(2026, 10, 13, 23, tzinfo=UTC))
+    revision = replace(
+        original, timestamp=datetime(2026, 10, 14, 1, tzinfo=UTC), tokens=(10, 20, 20, 30)
+    )
+    for item in (revision, original) if reverse else (original, revision):
+        ledger.add(item, NOW)
+    assert ledger.summary(NOW, 30).requests == 0
+    ledger.add(revision, NOW)
+    assert ledger.summary(NOW, 30).requests == 0
+
+
+def test_old_only_backfill_cannot_starve_current_usage_capacity():
+    ledger = UsageLedger(limit=2)
+    for index in range(3):
+        old = replace(parsed(identifier=f"old-{index}"), timestamp=datetime(2020, 1, 1, tzinfo=UTC))
+        ledger.add(old, NOW)
+    ledger.prune(NOW)
+    assert not ledger.records and not ledger.originals
+    assert ledger.add(parsed(identifier="fresh"), NOW)
+    assert ledger.summary(NOW, 1).requests == 1
+    assert len(ledger.historical_originals) <= 2
