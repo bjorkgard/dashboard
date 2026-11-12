@@ -16,6 +16,7 @@ from dayboard.core.scheduler import Scheduler
 from dayboard.core.store import SnapshotStore
 from dayboard.integrations.runtime import build_live_registry
 from dayboard.paths import AppPaths
+from dayboard.ui.ai import AICard, AIDetailCard
 from dayboard.ui.card import SnapshotCard
 from dayboard.ui.details import DetailCard
 from dayboard.ui.settings import SettingsScreen
@@ -43,6 +44,7 @@ class DayboardApp(App[None]):
         Binding("2", "workspace('schedule')", "Schedule", show=False),
         Binding("3", "workspace('mac')", "Mac", show=False),
         Binding("4", "workspace('github')", "GitHub", show=False),
+        Binding("5", "workspace('ai')", "AI", show=False),
     ]
 
     def __init__(self, *, demo: bool = False, paths: AppPaths | None = None) -> None:
@@ -91,6 +93,8 @@ class DayboardApp(App[None]):
                         for panel, name, _ in PANELS:
                             if panel == "mac" and not self.demo:
                                 yield TelemetryCard(panel, name)
+                            elif panel == "ai":
+                                yield AICard(panel, name)
                             else:
                                 yield SnapshotCard(panel, name)
                     yield Static(
@@ -101,7 +105,8 @@ class DayboardApp(App[None]):
                     )
                     yield Static(
                         "Local CPU/RAM/network are live. Calendar/weather/GitHub are opt-in. "
-                        "Mail, AI integrations and flip-clock animation remain on the roadmap.",
+                        "Claude local usage is opt-in. Mail, other AI integrations and "
+                        "flip-clock animation remain on the roadmap.",
                         id="scope",
                         markup=False,
                     )
@@ -140,13 +145,24 @@ class DayboardApp(App[None]):
                         markup=False,
                     )
                     yield DetailCard("github-detail", "REPOSITORY ACTIVITY")
+            with TabPane("5 AI", id="ai"):
+                with VerticalScroll(id="ai-scroll", classes="workspace-scroll"):
+                    yield Static(
+                        "AI / Claude Code selected local source · partial account coverage\n"
+                        "Today / 7 / 30 calendar days in the saved timezone. Source check time "
+                        "is separate from latest usage activity. History is memory-only; "
+                        "restart/Save reindexes. Costs and account quotas are unavailable.",
+                        classes="detail-note",
+                        markup=False,
+                    )
+                    yield AIDetailCard("ai-detail", "CLAUDE CODE USAGE")
         yield Footer()
 
     def action_workspace(self, pane: str) -> None:
         # Never navigate underneath Settings/onboarding or consume their text input.
         if self.screen is not self.screen_stack[0] or self._applying_settings:
             return
-        if pane not in ("overview", "schedule", "mac", "github"):
+        if pane not in ("overview", "schedule", "mac", "github", "ai"):
             return
         self.query_one("#workspace-tabs", TabbedContent).active = pane
         scroll = "workspace" if pane == "overview" else f"{pane}-scroll"
@@ -202,6 +218,7 @@ class DayboardApp(App[None]):
             ("weather", Capability.WEATHER),
             ("calendar", Capability.CALENDAR),
             ("github", Capability.GITHUB),
+            ("claude", Capability.AI),
         ):
             provider = next(
                 (p for p in self.registry.all() if capability in p.spec.capabilities),
@@ -269,7 +286,7 @@ class DayboardApp(App[None]):
         )
         for panel, _, capability in PANELS:
             cards = [base.query_one(f"#card-{panel}", SnapshotCard)]
-            if panel in ("schedule", "mac", "github"):
+            if panel in ("schedule", "mac", "github", "ai"):
                 cards.append(base.query_one(f"#card-{panel}-detail", SnapshotCard))
             if panel == "mac" and not self.demo:
                 cards.append(base.query_one("#card-mac-metrics", SnapshotCard))
@@ -304,7 +321,7 @@ class DayboardApp(App[None]):
 
     def action_help(self) -> None:
         self.notify(
-            "1–4: Overview / Schedule / Mac / GitHub · q: Quit · s: Settings · "
+            "1–5: Overview / Schedule / Mac / GitHub / AI · q: Quit · s: Settings · "
             "Tab/Shift-Tab: Focus · Left/Right on tabs: Switch · Arrows/Page Down: Scroll · "
             "Ctrl-S: Save / Esc: Cancel in Settings · "
             "uv run dayboard doctor: Safe diagnostics.",

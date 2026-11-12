@@ -18,12 +18,16 @@ def diagnose(paths: AppPaths) -> tuple[dict[str, str | int | bool], bool]:
         "account_count": 0,
         "keychain_backend": "unavailable",
         "keychain_access": "not tested (no credentials read)",
-        "live_integrations": "local CPU/RAM/network; calendar/weather/GitHub are explicit opt-in",
+        "live_integrations": (
+            "local CPU/RAM/network; calendar/weather/GitHub/Claude are explicit opt-in"
+        ),
         "github_enabled": False,
         "github_repository_count": 0,
         "telemetry": "automatic local OS counters in normal mode; no network probes",
         "calendar_enabled": False,
         "weather_enabled": False,
+        "claude_enabled": False,
+        "claude_source_access": "not tested (no source files read)",
     }
     healthy = True
     try:
@@ -36,6 +40,7 @@ def diagnose(paths: AppPaths) -> tuple[dict[str, str | int | bool], bool]:
             report["weather_enabled"] = config.weather.enabled
             report["github_enabled"] = config.github.enabled
             report["github_repository_count"] = len(config.github.repositories)
+            report["claude_enabled"] = config.claude.enabled
     except ConfigError:
         report["configuration"] = "invalid"
         healthy = False

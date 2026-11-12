@@ -3,10 +3,45 @@
 import math
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dayboard.errors import ConfigError
+
+
+@dataclass(frozen=True)
+class ClaudeSettings:
+    enabled: bool = False
+    source_root: str = ""
+    timezone: str = "UTC"
+
+    def __post_init__(self) -> None:
+        if type(self.enabled) is not bool or not _text(self.source_root, 2048):
+            raise ConfigError("Invalid Claude preferences.")
+        if self.source_root and (
+            not Path(self.source_root).is_absolute() or ".." in Path(self.source_root).parts
+        ):
+            raise ConfigError(
+                "Claude source must be an absolute directory without parent traversal."
+            )
+        if self.enabled and not self.source_root:
+            raise ConfigError("Choose a Claude source directory before enabling collection.")
+        try:
+            if not _text(self.timezone, 100):
+                raise ValueError
+            ZoneInfo(self.timezone)
+        except (ValueError, TypeError, ZoneInfoNotFoundError):
+            raise ConfigError("Choose a valid IANA timezone for Claude usage.") from None
+
+    @classmethod
+    def decode(cls, value: Any) -> "ClaudeSettings":
+        if not isinstance(value, dict) or value.keys() - {"enabled", "source_root", "timezone"}:
+            raise ConfigError("Unexpected Claude settings; credentials are not supported.")
+        return cls(**value)
+
+    def encode(self) -> dict[str, str | bool]:
+        return {"enabled": self.enabled, "source_root": self.source_root, "timezone": self.timezone}
 
 
 def _text(value: str, limit: int) -> bool:

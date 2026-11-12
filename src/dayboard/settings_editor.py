@@ -2,9 +2,12 @@
 
 import re
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from dayboard.config import Config, ConfigError, ConfigStore
-from dayboard.settings import GitHubSettings, WeatherSettings
+from dayboard.core.providers import ProviderUnavailable
+from dayboard.integrations.ai.reader import validate_source
+from dayboard.settings import ClaudeSettings, GitHubSettings, WeatherSettings
 
 
 class SettingsValidationError(ConfigError):
@@ -24,6 +27,9 @@ class SettingsDraft:
     units: str = "celsius"
     github_enabled: bool = False
     repositories: str = ""
+    claude_enabled: bool = False
+    claude_source: str = ""
+    claude_timezone: str = "UTC"
 
 
 def build_candidate(original: Config, draft: SettingsDraft) -> Config:
@@ -55,23 +61,45 @@ def build_candidate(original: Config, draft: SettingsDraft) -> Config:
             github = GitHubSettings(True, repositories)
         except ConfigError as error:
             raise SettingsValidationError("GitHub", str(error)) from None
+    claude = replace(original.claude, enabled=False)
+    if draft.claude_enabled:
+        try:
+            claude = ClaudeSettings(
+                True,
+                str(Path(draft.claude_source.strip()).expanduser()),
+                draft.claude_timezone.strip(),
+            )
+        except (ConfigError, RuntimeError):
+            raise SettingsValidationError(
+                "Claude", "Choose an absolute source directory and a valid IANA timezone."
+            ) from None
     return replace(
         original,
         onboarding_complete=True,
         weather=weather,
         github=github,
         calendar=replace(original.calendar, enabled=draft.calendar_enabled),
+        claude=claude,
     )
 
 
 def save_draft(store: ConfigStore, opened: Config, draft: SettingsDraft) -> Config:
     latest = store.load() or Config()
-    if (latest.calendar, latest.weather, latest.github) != (
+    if (latest.calendar, latest.weather, latest.github, latest.claude) != (
         opened.calendar,
         opened.weather,
         opened.github,
+        opened.claude,
     ):
         raise ConfigError("Integration settings changed externally. Cancel and reopen Settings.")
     candidate = build_candidate(latest, draft)
+    if candidate.claude.enabled:
+        try:
+            validate_source(candidate.claude.source_root)
+        except ProviderUnavailable:
+            raise SettingsValidationError(
+                "Claude",
+                "Source unavailable, unsafe or inaccessible. Choose an owned Claude directory.",
+            ) from None
     store.save(candidate)
     return candidate

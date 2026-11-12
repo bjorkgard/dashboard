@@ -2,7 +2,9 @@
 
 import asyncio
 import math
+import os
 from collections.abc import Coroutine
+from pathlib import Path
 from typing import Any
 
 from rich.text import Text
@@ -177,6 +179,42 @@ class SettingsScreen(Screen[Config | None]):
                     classes="settings-note",
                     markup=False,
                 )
+            with Vertical(classes="settings-panel"):
+                claude = self.config.claude
+                yield Static("CLAUDE CODE · LOCAL USAGE", classes="settings-section", markup=False)
+                yield Static(
+                    f"Saved: {'on' if claude.enabled else 'off'} · "
+                    f"Current: {self.connections.get('claude', 'not connected')}",
+                    classes="settings-note",
+                    markup=False,
+                )
+                yield Static(
+                    "Opt-in: session JSONL contains conversations. Dayboard transiently reads "
+                    "bounded records but retains only usage metadata in memory. No prompts, "
+                    "tool arguments, credentials, network requests or Claude configuration edits. "
+                    "Local partial coverage only; no billing or account quotas.",
+                    classes="settings-note",
+                    markup=False,
+                )
+                with Horizontal(classes="settings-toggle"):
+                    yield Static("Enable Claude local usage", markup=False)
+                    yield Switch(claude.enabled, id="claude-enabled", disabled=disabled)
+                yield Static("Confirmed Claude root (contains projects/)", classes="settings-label")
+                candidate = claude.source_root
+                if not candidate and not self.demo:
+                    candidate = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
+                yield Input(candidate, id="claude-source", disabled=disabled)
+                yield Static("Usage calendar timezone (IANA)", classes="settings-label")
+                yield Input(claude.timezone, id="claude-timezone", disabled=disabled)
+                yield Static(
+                    "Save explicitly confirms this source. No scanning on screen entry. "
+                    "Restart/Save rebuilds the bounded 30-day in-memory history. "
+                    "Disabling preserves preferences, clears readings and never deletes "
+                    "Claude logs. Saving migrates preferences to schema 4; "
+                    "older releases cannot read that file.",
+                    classes="settings-note",
+                    markup=False,
+                )
         with Horizontal(id="settings-actions"):
             yield Button("Save [Ctrl-S]", id="settings-save", variant="primary", disabled=disabled)
             yield Button("Cancel [Esc]", id="settings-cancel")
@@ -240,6 +278,9 @@ class SettingsScreen(Screen[Config | None]):
             units=units if isinstance(units, str) else "",
             github_enabled=self.query_one("#github-enabled", Switch).value,
             repositories=self.query_one("#github-repos", Input).value,
+            claude_enabled=self.query_one("#claude-enabled", Switch).value,
+            claude_source=self.query_one("#claude-source", Input).value,
+            claude_timezone=self.query_one("#claude-timezone", Input).value,
         )
 
     def _lock_controls(self, locked: bool) -> None:
@@ -281,7 +322,9 @@ class SettingsScreen(Screen[Config | None]):
             config = await asyncio.to_thread(save_draft, self.store, self.config, draft)
         except Exception as error:
             message = (
-                "Integration settings changed externally. Cancel and reopen Settings."
+                str(error)
+                if isinstance(error, SettingsValidationError)
+                else "Integration settings changed externally. Cancel and reopen Settings."
                 if isinstance(error, ConfigError) and "changed externally" in str(error)
                 else "Cannot save protected settings. Check application directory permissions."
             )

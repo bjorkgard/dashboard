@@ -9,7 +9,7 @@ from typing import Any
 from dayboard.errors import ConfigError as ConfigError
 from dayboard.paths import AppPaths, private_read, private_write
 from dayboard.security.identifiers import validate_identifier
-from dayboard.settings import CalendarSettings, GitHubSettings, WeatherSettings
+from dayboard.settings import CalendarSettings, ClaudeSettings, GitHubSettings, WeatherSettings
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ class AccountRef:
 
 @dataclass(frozen=True)
 class Config:
-    schema_version: int = 3
+    schema_version: int = 4
     onboarding_complete: bool = False
     accounts: tuple[AccountRef, ...] = ()
     theme: str = "dark"
@@ -40,9 +40,10 @@ class Config:
     weather: WeatherSettings = WeatherSettings()
     calendar: CalendarSettings = CalendarSettings()
     github: GitHubSettings = GitHubSettings()
+    claude: ClaudeSettings = ClaudeSettings()
 
     def __post_init__(self) -> None:
-        if type(self.schema_version) is not int or self.schema_version != 3:
+        if type(self.schema_version) is not int or self.schema_version != 4:
             raise ConfigError("Unsupported configuration version.")
         if not isinstance(self.weather, WeatherSettings) or not isinstance(
             self.calendar, CalendarSettings
@@ -50,6 +51,8 @@ class Config:
             raise ConfigError("Invalid integration preferences.")
         if not isinstance(self.github, GitHubSettings):
             raise ConfigError("Invalid GitHub preferences.")
+        if not isinstance(self.claude, ClaudeSettings):
+            raise ConfigError("Invalid Claude preferences.")
         if type(self.onboarding_complete) is not bool or type(self.reduced_motion) is not bool:
             raise ConfigError("Configuration flags must be booleans.")
         if self.theme not in ("dark", "light", "terminal"):
@@ -70,7 +73,7 @@ class Config:
             raise ConfigError("Configuration must be an object.")
         data = data.copy()
         version = data.get("schema_version")
-        if type(version) is not int or version not in (0, 1, 2, 3):
+        if type(version) is not int or version not in (0, 1, 2, 3, 4):
             raise ConfigError("Unsupported configuration version.")
         if version == 0:
             allowed = {"schema_version", "setup_complete", "accounts", "theme", "reduced_motion"}
@@ -89,6 +92,11 @@ class Config:
                 raise ConfigError("Unexpected legacy integration fields.")
             data["schema_version"] = 3
         allowed.add("github")
+        if version in (0, 1, 2, 3):
+            if data.keys() - allowed:
+                raise ConfigError("Unexpected legacy integration fields.")
+            data["schema_version"] = 4
+        allowed.add("claude")
         if data.keys() - allowed:
             raise ConfigError("Unexpected configuration fields.")
         accounts = data.get("accounts", [])
@@ -103,6 +111,7 @@ class Config:
         data["weather"] = WeatherSettings.decode(data.get("weather", {}))
         data["calendar"] = CalendarSettings.decode(data.get("calendar", {}))
         data["github"] = GitHubSettings.decode(data.get("github", {}))
+        data["claude"] = ClaudeSettings.decode(data.get("claude", {}))
         return cls(**data)
 
 
@@ -131,6 +140,7 @@ class ConfigStore:
             "weather": config.weather.encode(),
             "calendar": config.calendar.encode(),
             "github": config.github.encode(),
+            "claude": config.claude.encode(),
             "accounts": [
                 {"id": account.id, "provider": account.provider, "label": account.label}
                 for account in config.accounts

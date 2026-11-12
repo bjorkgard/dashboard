@@ -49,8 +49,11 @@ class SampleProvider:
                 Metric("checks", "Checks need attention", 1),
             ),
             "ai": (
-                Metric("tokens", "Sample tokens", 124_000 + 850 * self._tick),
-                Metric("sessions", "Sample sessions", 2),
+                Metric("coverage", "Coverage", "Synthetic local usage example, not account limits"),
+                Metric("today-input", "1d uncached input", 124_000 + 850 * self._tick, "tokens"),
+                Metric("today-output", "1d output", 5000, "tokens"),
+                Metric("today-sessions", "1d observed sessions", 2),
+                Metric("cost", "Cost / account limits", "Unavailable in synthetic preview"),
             ),
             "weather": (
                 Metric("temperature", "Temperature", 12, "°C"),

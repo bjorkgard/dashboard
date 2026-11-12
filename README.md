@@ -20,6 +20,9 @@ preferences. The existing v0.2.0 integrations remain supported.
 **New in v0.4.0:** Overview, Schedule, Mac and GitHub tabs provide expanded views of
 the existing live sources. v0.3.0 retains the single overview.
 
+**Unreleased (development checkout):** opt-in Claude Code local usage and a fifth
+AI tab. This is not included in the published v0.4.0 wheel.
+
 ## What works today
 
 - A terminal workspace with a ticking local clock and foundation-preview cards.
@@ -39,9 +42,9 @@ the existing live sources. v0.3.0 retains the single overview.
   and recent default-branch commits, using GitHub CLI's existing authentication.
 - Unit, headless UI, and real pseudo-terminal startup/shutdown tests.
 
-Account selection/login, Inbox/AI detail tabs, the animated flip clock, GPU/temperature
+Account selection/login, Inbox detail tabs, the animated flip clock, GPU/temperature
 graphs, direct Google/Microsoft calendar connections, mail/task providers, GitHub
-issues/notifications/personal review queues, AI-provider analytics, and the [aapl.io](https://aapl.io) news ticker
+issues/notifications/personal review queues, other AI-provider analytics, and the [aapl.io](https://aapl.io) news ticker
 are planned work. Calendars already synced with macOS use the OS's existing accounts
 after explicit permission; new cloud-account login is not implemented in this slice.
 
@@ -140,7 +143,55 @@ to the selected tab; Save resets old-scope readings in both overview and detail
 views. Number keys remain normal text input in Settings and do not navigate
 underneath onboarding. Tab selection is session-only, not saved as a preference.
 Demo tabs use synthetic data only; no new permissions or credentials are required.
-Inbox and AI detail tabs remain deferred until their live providers exist.
+Inbox detail tabs remain deferred until their live providers exist. The development
+checkout adds the opt-in Claude AI tab described below.
+
+### Claude Code local usage (unreleased)
+
+1. Run the development checkout in normal mode, then press **s**.
+2. Read the Claude privacy notice. Confirm a single absolute Claude root containing
+   `projects/` (normally `~/.claude`; a single `CLAUDE_CONFIG_DIR` value can be offered
+   as a candidate). There is no automatic search of alternative locations.
+3. Choose an IANA aggregation timezone, such as `UTC` or `Europe/Stockholm`.
+4. Enable **Claude local usage** and press **Ctrl-S**. Only this explicit Save validates
+   the source directory and starts collection; opening Settings/Cancel does not scan it.
+5. Press **5** for AI details. The overview shows compact today counters.
+
+The source JSONL files contain conversations as well as usage. The reader transiently
+reads bounded lines but copies only allowlisted IDs, timestamps, model/version and token
+metadata into an in-memory ledger. It does not retain prompts, responses, tool arguments,
+raw lines, project paths in usage records, or account credentials. It never edits Claude
+files/settings, changes their permissions, installs hooks, launches Claude or sends
+network/inference requests. Symlinks, hard links, nonregular files and unexpected ownership
+are rejected rather than followed; the source must be a directly accessible owned tree.
+
+The observed Claude Code 2.x `message.usage` profile is compatibility-tested, not a
+vendor-guaranteed transcript API. Input, output, cache writes and cache reads are separate;
+missing categories remain Unknown. Repeated message identities are reconciled across
+files/forks, coherent streaming revisions replace partial counters, and conflicting
+records are quarantined. Distinct subagent requests are included. Usage covers only the
+selected local source, not claude.ai, other machines or a verified account identity.
+
+AI details show today and the last 7/30 calendar dates in the saved timezone, observed
+sessions (not active processes), top-ten models by observed request count and a remainder.
+Latest usage activity is separate from source-check freshness. Cost, subscription
+consumption and account quotas are **unavailable**, never inferred from tokens.
+
+The ledger/cursors are memory-only: every restart or successful Settings Save reindexes;
+deleted source history cannot be recovered. Collection targets five seconds; directory
+rediscovery targets 30 seconds. Initial limits are 5,000 files, eight directory levels,
+20,000 discovery entries, 8 MiB/two seconds of scan work per pass, 1 MiB per JSONL record,
+and 100,000 canonical requests over 30 calendar dates. Large backlogs index incrementally.
+Caps, skipped/unsupported records and conflicts produce explicit partial/observed-so-far
+indicators, not claims of complete history. Diagnostics persist for the reader lifetime;
+Save/restart resets them while rebuilding history. Only a successfully scanned empty
+window shows zero; incomplete empty windows remain unknown.
+
+Disable Claude in Settings and Save to stop reading and clear its in-memory state.
+The source/timezone preferences remain saved; Claude's own logs are never removed.
+`dayboard doctor` reports enablement without scanning the source or printing its path.
+Demo AI data and Settings remain isolated and synthetic. Live verification of private
+sessions is user-directed and is not claimed by the synthetic test suite.
 
 ### In-dashboard Settings
 
@@ -343,9 +394,11 @@ Both modules retain their last good in-memory readings on failures and mark them
 stale; persistent offline weather restoration and account-authenticated calendar
 end-to-end verification are not claimed here.
 
-Configuration is now schema 3. Schemas 0/1/2 migrate in memory and are saved only on
-an explicit settings/onboarding action. The older v0.1.0 binary cannot read schema 3;
-do not downgrade against newly saved preferences without restoring an older backup.
+The development checkout uses configuration schema 4 for Claude preferences.
+Schemas 0/1/2/3 migrate in memory with Claude disabled and are written only on an
+explicit Save/onboarding action. Published v0.4.0 and earlier cannot read schema 4;
+back up preferences before using the development checkout, and restore a compatible
+backup before downgrading. Package version remains 0.4.0 until a separately requested release.
 
 ### Remaining development roadmap
 
@@ -357,7 +410,8 @@ do not downgrade against newly saved preferences without restoring an older back
    GPU/temperature/fan/power readings.
 5. Expand GitHub status with personal review queues/issues/notifications and local
    repository monitoring; open-PR/default-branch commit previews are now implemented.
-6. Add opt-in Claude/Codex/Kiro/Warp analytics with honest source/estimate labels.
+6. Extend AI analytics: Claude local usage is implemented in the development checkout;
+   Codex/Kiro/Warp, durable usage storage, quotas and pricing remain planned.
 7. Add the clickable aapl.io ticker, animated flip clock, responsive detail views,
    reduced-motion options and resource/performance hardening.
 
@@ -365,6 +419,7 @@ do not downgrade against newly saved preferences without restoring an older back
 
 - **q** — quit from any workspace tab; in Settings, cancel when not editing text.
 - **1 / 2 / 3 / 4** — Overview / Schedule / Mac / GitHub (v0.4.0+).
+- **5** — AI / Claude local usage (development checkout).
 - **Left / Right** — switch tabs when the tab bar is focused (v0.4.0+).
 - **s** — open Settings (read-only in demo mode).
 - **Ctrl-S** — save and apply Settings without exiting the dashboard.

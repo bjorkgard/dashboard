@@ -26,6 +26,10 @@ class ConnectionState(StrEnum):
 
 
 class ErrorCode(StrEnum):
+    AI_SOURCE_UNAVAILABLE = (
+        "Claude source unavailable or unsafe; choose an owned directory in Settings"
+    )
+    AI_PERMISSION_DENIED = "Claude source access denied; review source permissions"
     GITHUB_SETUP_REQUIRED = (
         "GitHub unavailable; install gh, run gh auth login, and check repository access"
     )

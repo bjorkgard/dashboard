@@ -6,7 +6,28 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+- Opt-in Claude Code local usage with an AI tab (`5`) and compact overview counters.
+- Metadata-only in-memory usage ledger with source-scoped message deduplication,
+  coherent streaming revision replacement, conflict quarantine and separate cache categories.
+- Read-only descriptor-based JSONL discovery/tailing with bounded work, cooperative
+  cancellation, unsafe-path rejection and partial-coverage diagnostics.
+- Today/7-day/30-day calendar-window counters, model summaries, observed sessions
+  and separate source-check/activity timestamps. No cost or account-quota inference.
+
+### Compatibility and privacy
+
+- Configuration schema 4 migrates schemas 0–3 in memory with Claude disabled.
+  Explicit Save validates the selected source and applies changes live; opening
+  Settings/Cancel/demo does not scan Claude sources. Older releases cannot read
+  schema-4 preferences after saving.
+- Source files include conversations; bounded records are transiently read, but only
+  allowlisted usage metadata is retained in memory. No source writes/chmod, hooks,
+  credentials, network calls, inference or persistent private usage cache.
+- The observed Claude Code 2.x format is not a vendor schema guarantee. Indexing
+  and skipped/conflicting data are labelled partial. Restart/Settings Save rebuilds
+  available history; deleted source history cannot be recovered. Other AI providers remain planned.
 
 ## [0.4.0] - 2026-11-12
 
