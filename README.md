@@ -17,12 +17,17 @@ Demo values are synthetic, not readings from your Mac or accounts.
 lookup, Calendar authorization and GitHub editing, with live application of saved
 preferences. The existing v0.2.0 integrations remain supported.
 
+**Unreleased (source checkout):** Overview, Schedule, Mac and GitHub tabs provide
+expanded views of the existing live sources. Published v0.3.0 retains the single overview.
+
 ## What works today
 
 - A terminal workspace with a ticking local clock and foundation-preview cards.
 - An isolated `--demo` mode with changing synthetic readings.
 - First-run onboarding that can save an unconnected workspace or quit without saving.
 - In-dashboard Settings with city lookup and live Save/Cancel configuration.
+- In the development checkout: keyboard/mouse tab navigation and expanded agenda,
+  Mac telemetry history, and bounded GitHub PR/commit detail views.
 - Strict, versioned configuration with owner-only permissions and atomic writes.
 - A macOS Keychain credential wrapper with no plaintext fallback.
 - Provider contracts, independent asynchronous collection, timeouts, retry backoff,
@@ -34,7 +39,7 @@ preferences. The existing v0.2.0 integrations remain supported.
   and recent default-branch commits, using GitHub CLI's existing authentication.
 - Unit, headless UI, and real pseudo-terminal startup/shutdown tests.
 
-Account selection/login, full tabs, the animated flip clock, GPU/temperature
+Account selection/login, Inbox/AI detail tabs, the animated flip clock, GPU/temperature
 graphs, direct Google/Microsoft calendar connections, mail/task providers, GitHub
 issues/notifications/personal review queues, AI-provider analytics, and the [aapl.io](https://aapl.io) news ticker
 are planned work. Calendars already synced with macOS use the OS's existing accounts
@@ -101,6 +106,41 @@ without cloud accounts, or **Quit** without saving. (v0.2.0 uses the longer
 Continue without accounts / Quit without saving labels.) Only explicitly configured
 sources become live; normal mode never substitutes synthetic data. Basic local telemetry
 is available automatically.
+
+### Workspace navigation (unreleased)
+
+The development checkout includes four workspace tabs:
+
+- **1 — Overview:** clock, weather and compact integration cards. Agenda previews
+  remain limited to six events; GitHub previews show up to five PRs and five commits.
+- **2 — Schedule:** the existing seven-day Calendar window, expanded to show all
+  returned occurrences (up to 100), with source labels, local dates/times, all-day
+  markers and explicit truncation when reported by the helper.
+- **3 — Mac:** CPU/RAM/network graphs from the same bounded sample history, plus
+  collected metric values. Dots mean unknown samples; VPN/bridge traffic can be
+  counted more than once. Disk, battery, processes and advanced sensors are not added.
+- **4 — GitHub:** grouped PR and recent default-branch commit lists from selected
+  repositories, including draft/review/check/merge states and partial-access notices.
+  The existing query returns at most ten PRs and five commits per repository
+  (up to 50 PRs and 25 commits across five repositories); this is not a complete
+  account-wide feed or personal review queue.
+
+Press **1–4** or click a tab. **Tab / Shift-Tab** moves focus; **Left / Right**
+switches tabs when the tab bar is focused. Focus a scroll region to use arrow keys
+and **Page Up / Page Down**; number shortcuts focus the selected region directly.
+The overview uses one column below 100 terminal columns and two on wider terminals.
+
+All views share one collector registry, scheduler and snapshot store. Switching
+tabs does not issue requests, restart collectors or reset history. Source errors
+retain last-good data with stale/error indicators and observation timestamps.
+Disabled sources show Not connected with a Settings hint rather than sample data.
+
+Open Settings with **s** or the visible button from any tab. Save and Cancel return
+to the selected tab; Save resets old-scope readings in both overview and detail
+views. Number keys remain normal text input in Settings and do not navigate
+underneath onboarding. Tab selection is session-only, not saved as a preference.
+Demo tabs use synthetic data only; no new permissions or credentials are required.
+Inbox and AI detail tabs remain deferred until their live providers exist.
 
 ### In-dashboard Settings
 
@@ -309,7 +349,8 @@ do not downgrade against newly saved preferences without restoring an older back
 
 ### Remaining development roadmap
 
-1. Finish full workspace tabs/detail views; in-app Settings is included from v0.3.0.
+1. Extend workspace detail views as new providers arrive; Overview/Schedule/Mac/GitHub
+   tabs are implemented in the development checkout, and Settings shipped in v0.3.0.
 2. Expand calendar providers with ICS/CalDAV and Google/Microsoft authorization.
 3. Add Apple Reminders/Mail, Google Tasks/Gmail, Microsoft To Do/mail, and IMAP.
 4. Expand baseline Mac metrics with disk/battery/process views, then capability-checked
@@ -322,7 +363,9 @@ do not downgrade against newly saved preferences without restoring an older back
 
 ### Controls and diagnostics
 
-- **q** — quit from the overview; in Settings, cancel when not editing text.
+- **q** — quit from any workspace tab; in Settings, cancel when not editing text.
+- **1 / 2 / 3 / 4** — Overview / Schedule / Mac / GitHub (development checkout).
+- **Left / Right** — switch tabs when the tab bar is focused (development checkout).
 - **s** — open Settings (read-only in demo mode).
 - **Ctrl-S** — save and apply Settings without exiting the dashboard.
 - **Escape** — cancel Settings without saving; close an open dropdown first.

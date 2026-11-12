@@ -5,7 +5,7 @@ import asyncio
 from importlib.metadata import version
 from importlib.resources import files
 
-from textual.widgets import Button, Static
+from textual.widgets import Button, Static, TabbedContent
 
 from dayboard.app import DayboardApp
 from dayboard.ui.settings import SettingsScreen
@@ -29,6 +29,15 @@ async def smoke(expected_version: str) -> None:
             raise RuntimeError("Isolated smoke test did not start in demo mode.")
         if not app.store.history(app.registry.all()[0].spec.key):
             raise RuntimeError("Synthetic collector did not produce a reading.")
+        scheduler = app.scheduler
+        for key, pane in (("2", "schedule"), ("3", "mac"), ("4", "github")):
+            await pilot.press(key)
+            if app.query_one(TabbedContent).active != pane:
+                raise RuntimeError("Installed workspace navigation did not switch tabs.")
+            if "SYNTHETIC" not in str(app.query_one(f"#card-{pane}-detail", Static).render()):
+                raise RuntimeError("Installed detail view did not show synthetic data.")
+        if app.scheduler is not scheduler:
+            raise RuntimeError("Tab navigation must not replace collectors.")
         await pilot.press("s")
         await pilot.pause()
         if not isinstance(app.screen, SettingsScreen):
@@ -39,6 +48,8 @@ async def smoke(expected_version: str) -> None:
         await pilot.pause()
         if isinstance(app.screen, SettingsScreen):
             raise RuntimeError("Cancel did not return to the installed overview.")
+        if app.query_one(TabbedContent).active != "github":
+            raise RuntimeError("Settings Cancel did not preserve the selected workspace tab.")
         await pilot.press("q")
     if app.scheduler.running_count:
         raise RuntimeError("Collectors remained alive after exit.")

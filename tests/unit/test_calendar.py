@@ -102,6 +102,22 @@ async def test_provider_only_requests_events_not_authorization():
     assert reading.key.provider == "apple-calendar"
 
 
+async def test_provider_retains_bounded_agenda_beyond_overview_preview():
+    class Reader:
+        async def call(self, operation):
+            assert operation == "events"
+            return {
+                "schema_version": 1,
+                "status": "authorized",
+                "truncated": True,
+                "events": [event(id=f"event-{i}", title=f"Meeting {i}") for i in range(100)],
+            }
+
+    reading = await CalendarProvider(CalendarSettings(True), Reader(), clock=lambda: NOW).collect()
+    assert sum(m.id.startswith("event-") for m in reading.metrics) == 100
+    assert "truncated" in str(reading.metrics[0].value)
+
+
 async def test_bridge_subprocess_protocol_and_operation_allowlist(tmp_path):
     tool = tmp_path / "bridge"
     tool.write_text(

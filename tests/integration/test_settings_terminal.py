@@ -47,12 +47,25 @@ def test_settings_keyboard_flow_keeps_owned_application_running_until_explicit_q
             tail = output[offset:]
             marker = b"SYNTHETIC" if demo else b"FIRST RUN"
             if phase == "startup" and marker in tail and b"DAYBOARD" in output:
+                os.write(master, b"2" if demo else b"s")
+                phase, offset = "schedule" if demo else "settings", len(output)
+            elif phase == "schedule" and b"SEVEN-DAY AGENDA" in tail:
+                os.write(master, b"3")
+                phase, offset = "mac", len(output)
+            elif phase == "mac" and b"SYNTHETIC MAC METRICS" in tail:
+                os.write(master, b"4")
+                phase, offset = "github", len(output)
+            elif phase == "github" and b"REPOSITORY ACTIVITY" in tail:
                 os.write(master, b"s")
                 phase, offset = "settings", len(output)
             elif phase == "settings" and b"INTEGRATION SETTINGS" in tail:
                 os.write(master, b"\x1b" if demo else b"\x13")  # Esc / Ctrl-S
                 phase, offset = "overview", len(output)
-            elif phase == "overview" and b"DAYBOARD" in tail:
+            elif (
+                phase == "overview"
+                and b"DAYBOARD" in tail
+                and (not demo or b"REPOSITORY ACTIVITY" in tail)
+            ):
                 returned_alive = process.poll() is None
                 os.write(master, b"q")  # Only this owned test PTY, never the user's dashboard.
                 phase = "quit"

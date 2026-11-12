@@ -6,7 +6,25 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+- Overview, Schedule, Mac and GitHub workspace tabs with visible mouse targets,
+  number shortcuts and keyboard navigation, preserving the selected tab across Settings.
+- Expanded seven-day agenda (up to 100 returned occurrences), shared telemetry
+  history/metric details, and grouped bounded GitHub PR/default-branch commit lists.
+- Responsive one/two-column overview and independently scrollable detail panes.
+- Navigation, expanded-data, scope-reset and terminal-size regression coverage,
+  plus installed-package smoke checks for all detail tabs.
+
+### Behavior and scope
+
+- Tabs share the existing collectors and snapshot store; navigation adds no provider
+  requests or permission prompts. Overview previews remain at six events and five
+  PRs/commits; details retain the additional records already fetched within existing caps.
+- Loading, stale, error, provenance and partial-access states remain visible. Settings
+  Save clears old-scope readings across all views; demo tabs remain synthetic and isolated.
+- No new account providers, Inbox/AI detail tabs, hardware sensors or persistent tab
+  preference are introduced. Package version and configuration schema are unchanged.
 
 ## [0.3.0] - 2026-11-11
 
