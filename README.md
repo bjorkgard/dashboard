@@ -56,7 +56,122 @@ and the [aapl.io](https://aapl.io) news ticker
 are planned work. Calendars already synced with macOS use the OS's existing accounts
 after explicit permission; new cloud-account login is not implemented in this slice.
 
-## Run locally on a Mac
+## v0.6.0 release quick start
+
+Use this path to install the published release without cloning the repository.
+You need macOS, an interactive terminal, Python 3.13+ and uv 0.13.7+
+([prerequisites and uv installation](#requirements)).
+The wheel and source archive are Python packages, not a signed/notarized standalone
+macOS application. No PyPI publication is configured.
+
+### Download and install
+
+Download these three files from the [v0.6.0 release](https://github.com/bjorkgard/dashboard/releases/tag/v0.6.0)
+into the same directory:
+
+- `dayboard-0.6.0-py3-none-any.whl`
+- `dayboard-0.6.0.tar.gz`
+- `SHA256SUMS`
+
+In that download directory, verify both distributions before installing the wheel:
+
+```zsh
+shasum -a 256 -c SHA256SUMS
+uv tool install --python 3.13 ./dayboard-0.6.0-py3-none-any.whl
+dayboard --version
+dayboard --demo
+```
+
+Both checksum entries should report `OK`, and the version should be `dayboard 0.6.0`.
+Stop if verification fails. Checksums detect corruption, not publisher identity or
+code-signing status. Demo mode uses synthetic data and does not open real accounts,
+provider sources, Keychain or saved application state.
+
+If `dayboard` is not found, run `uv tool update-shell` and open a new terminal.
+The uv tool installation is separate from a checkout's `.venv`; use `dayboard` for
+the installed release and `uv run --locked dayboard` for the current source checkout.
+
+### Upgrade from an older release
+
+Quit your running Dayboard instance before upgrading. If it exists, copy
+`~/Library/Application Support/Dayboard/config.json` to a private backup location
+outside the repository and protect the copy with owner-only access. Do not export
+credentials or copy provider session files as part of this backup.
+
+**Compatibility:** v0.6.0 reads older schemas in memory, preserving existing
+integration choices and leaving new sources disabled. An explicit Save or first-run
+setup writes **schema 5**, which v0.5.0 and earlier cannot read. Downgrading requires
+restoring a compatible preference backup; reinstalling an older package alone is not enough.
+
+After downloading and verifying the v0.6.0 assets as above, replace the existing tool:
+
+```zsh
+uv tool install --reinstall --python 3.13 ./dayboard-0.6.0-py3-none-any.whl
+dayboard --version
+dayboard --demo
+```
+
+Installation does not enable new integrations, grant permissions or rewrite preferences.
+Preview first; start normal mode only when ready to use your saved configuration:
+
+```zsh
+dayboard
+```
+
+### First-run setup and everyday use
+
+On a new profile, choose **Configure** to open Settings, **Continue** for an
+unconnected workspace, or **Quit** without saving. Existing profiles load their
+saved settings. CPU/RAM/network telemetry starts automatically in normal mode.
+
+Press **s** from any workspace tab, configure only the sources you want, and use
+**Save / Ctrl-S** to apply without exiting. **Cancel / Escape** discards form edits.
+Settings Save restarts collectors and rebuilds in-memory AI history, so allow a
+brief warm-up rather than repeatedly saving while indexing.
+
+- [Calendar and weather](#calendar-and-weather-setup): explicit Calendar authorization
+  and a selected weather location; no automatic geolocation.
+- [GitHub](#github-prs-and-recent-commits): existing GitHub CLI login and one to five repositories.
+- [Claude](#claude-code-local-usage-v050): confirmed local source and timezone; no API key.
+- [Mail, Codex, Kiro and Warp/Oz](#apple-mail-and-remaining-ai-setup-v060):
+  explicit source/permission/key setup, with format and coverage limits described below.
+  Mail/AI setup is in Settings, not additional email/AI CLI subcommands.
+
+Use **1 Overview**, **2 Schedule**, **3 Mac**, **4 GitHub**, **5 AI** and **6 Inbox**.
+**Tab / Shift-Tab** moves focus; **Left / Right** switches tabs when the tab bar is
+focused; arrow keys and **Page Up / Page Down** scroll a focused region.
+Press **?** for help and **q** to quit from a workspace tab.
+
+### Troubleshooting setup
+
+- **Wrong version or executable:** run `command -v dayboard`, `uv tool list` and
+  `dayboard --version`. A globally installed tool and `uv run --locked dayboard`
+  may intentionally use different versions.
+- **Not connected:** the source is disabled or has no registered collector. Enable
+  the desired source and Save; selecting a workspace tab does not connect an account.
+- **Indexing / partial:** leave the dashboard open while bounded collection progresses.
+  Caps and sampled sources can prevent complete coverage. Restarting or saving
+  rebuilds memory-only history; it does not recover deleted provider logs.
+- **Unknown / unsupported:** missing counters, baselines or unrecognized formats are
+  not zero usage. Check the source-specific compatibility notes and diagnostics;
+  do not work around this by copying credentials or editing provider databases.
+- **Mail closed or denied:** open Mail yourself and use explicit authorization in
+  Settings. Background collection neither launches Mail nor requests permission.
+- **Codex limits or Warp unavailable:** check the separate opt-in, existing Codex
+  login or Dayboard-owned Warp key, selected scope, network and Keychain status.
+  Local usage, account quotas and Oz run previews are separate capabilities.
+
+For allowlisted local diagnostics:
+
+```zsh
+dayboard doctor --json
+```
+
+This checks configuration/backend availability without reading credentials, Mail or
+AI source contents; it does not prove provider connectivity or unlocked Keychain access.
+An absent configuration is expected before first-run setup.
+
+## Run from a source checkout on a Mac
 
 ### Requirements
 
@@ -90,6 +205,12 @@ git clone https://github.com/bjorkgard/dashboard.git
 cd dashboard
 uv sync --locked --python 3.13
 ```
+
+For the exact published source rather than the latest branch, optionally run
+`git switch --detach v0.6.0` and rerun `uv sync --locked --python 3.13`.
+The installed release and source
+checkout use the same default preferences, so the schema-5 backup warning above
+also applies when saving from source.
 
 Dependencies are installed in the project's `.venv`. You do not need to activate
 it or install Python packages globally. The initial install needs internet access.
@@ -320,6 +441,9 @@ The first-run **Configure** action opens the same screen.
      necessary, authenticate separately with GitHub CLI as described below.
    - **Claude:** review the privacy notice, confirm the local source and timezone,
      then enable collection. No login or API key is required.
+   - **Mail / Codex / Kiro / Warp:** follow the
+     [v0.6.0 provider setup](#apple-mail-and-remaining-ai-setup-v060) for explicit
+     mailbox/source selection, optional limits or masked Keychain setup.
 4. Click **Save [Ctrl-S]** or press **Ctrl-S**. The overview stays running while
    collectors restart with the new settings; CPU/network rates briefly warm up.
    To discard edits instead, use **Cancel [Esc]** or **Escape**.
@@ -531,7 +655,7 @@ a compatible backup before downgrading.
 
 - **q** — quit from any workspace tab; in Settings, cancel when not editing text.
 - **1 / 2 / 3 / 4** — Overview / Schedule / Mac / GitHub (v0.4.0+).
-- **5** — AI / Claude local usage (v0.5.0+).
+- **5** — AI / independent Claude, Codex local/limits, Kiro and Warp/Oz sections.
 - **6** — Inbox / Apple Mail headers (v0.6.0+).
 - **Left / Right** — switch tabs when the tab bar is focused (v0.4.0+).
 - **s** — open Settings (read-only in demo mode).
@@ -565,24 +689,10 @@ uv sync --locked --python 3.13
 
 ### Installing a published release
 
-Once a release has been published, download its wheel, source tarball, and
-`SHA256SUMS` from [GitHub Releases](https://github.com/bjorkgard/dashboard/releases).
-These are Python distributions, **not a signed/notarized standalone macOS app**.
-No PyPI publication is configured.
-
-From the directory containing all three downloads:
-
-```zsh
-shasum -a 256 -c SHA256SUMS
-uv tool install --python 3.13 ./dayboard-0.6.0-py3-none-any.whl
-dayboard --demo
-```
-
-The filename above illustrates v0.6.0; use the filename attached to
-your selected release. To install a newer downloaded wheel over an existing
-installation, add `--reinstall`. If `dayboard` is not found, run
-`uv tool update-shell` and open a new terminal. Checksums detect corrupted downloads;
-they are not a substitute for verifying the release source.
+Follow the [v0.6.0 release quick start](#v060-release-quick-start) for downloads,
+checksums, installation, first-run usage and troubleshooting, or the
+[upgrade instructions](#upgrade-from-an-older-release) for an existing tool.
+Use the filenames attached to your selected release if installing a different version.
 
 ## Security and local data
 
