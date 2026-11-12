@@ -26,6 +26,8 @@ metadata-only accounting and explicit local-source coverage.
 **New in v0.6.0:** Apple Mail headers and Inbox (`6`), independent
 Codex/Kiro/Warp-Oz modules, multi-source AI rendering, and recent-first Claude indexing.
 
+**v0.6.1** is a documentation-only patch with the same provider behavior and schema 5.
+
 ## What works today
 
 - A terminal workspace with a ticking local clock and foundation-preview cards.
@@ -56,7 +58,7 @@ and the [aapl.io](https://aapl.io) news ticker
 are planned work. Calendars already synced with macOS use the OS's existing accounts
 after explicit permission; new cloud-account login is not implemented in this slice.
 
-## v0.6.0 release quick start
+## v0.6.1 release quick start
 
 Use this path to install the published release without cloning the repository.
 You need macOS, an interactive terminal, Python 3.13+ and uv 0.13.7+
@@ -66,23 +68,23 @@ macOS application. No PyPI publication is configured.
 
 ### Download and install
 
-Download these three files from the [v0.6.0 release](https://github.com/bjorkgard/dashboard/releases/tag/v0.6.0)
+Download these three files from the [v0.6.1 release](https://github.com/bjorkgard/dashboard/releases/tag/v0.6.1)
 into the same directory:
 
-- `dayboard-0.6.0-py3-none-any.whl`
-- `dayboard-0.6.0.tar.gz`
+- `dayboard-0.6.1-py3-none-any.whl`
+- `dayboard-0.6.1.tar.gz`
 - `SHA256SUMS`
 
 In that download directory, verify both distributions before installing the wheel:
 
 ```zsh
 shasum -a 256 -c SHA256SUMS
-uv tool install --python 3.13 ./dayboard-0.6.0-py3-none-any.whl
+uv tool install --python 3.13 ./dayboard-0.6.1-py3-none-any.whl
 dayboard --version
 dayboard --demo
 ```
 
-Both checksum entries should report `OK`, and the version should be `dayboard 0.6.0`.
+Both checksum entries should report `OK`, and the version should be `dayboard 0.6.1`.
 Stop if verification fails. Checksums detect corruption, not publisher identity or
 code-signing status. Demo mode uses synthetic data and does not open real accounts,
 provider sources, Keychain or saved application state.
@@ -98,15 +100,15 @@ Quit your running Dayboard instance before upgrading. If it exists, copy
 outside the repository and protect the copy with owner-only access. Do not export
 credentials or copy provider session files as part of this backup.
 
-**Compatibility:** v0.6.0 reads older schemas in memory, preserving existing
+**Compatibility:** v0.6.1 reads older schemas in memory, preserving existing
 integration choices and leaving new sources disabled. An explicit Save or first-run
 setup writes **schema 5**, which v0.5.0 and earlier cannot read. Downgrading requires
 restoring a compatible preference backup; reinstalling an older package alone is not enough.
 
-After downloading and verifying the v0.6.0 assets as above, replace the existing tool:
+After downloading and verifying the v0.6.1 assets as above, replace the existing tool:
 
 ```zsh
-uv tool install --reinstall --python 3.13 ./dayboard-0.6.0-py3-none-any.whl
+uv tool install --reinstall --python 3.13 ./dayboard-0.6.1-py3-none-any.whl
 dayboard --version
 dayboard --demo
 ```
@@ -207,7 +209,7 @@ uv sync --locked --python 3.13
 ```
 
 For the exact published source rather than the latest branch, optionally run
-`git switch --detach v0.6.0` and rerun `uv sync --locked --python 3.13`.
+`git switch --detach v0.6.1` and rerun `uv sync --locked --python 3.13`.
 The installed release and source
 checkout use the same default preferences, so the schema-5 backup warning above
 also applies when saving from source.
@@ -689,7 +691,7 @@ uv sync --locked --python 3.13
 
 ### Installing a published release
 
-Follow the [v0.6.0 release quick start](#v060-release-quick-start) for downloads,
+Follow the [v0.6.1 release quick start](#v061-release-quick-start) for downloads,
 checksums, installation, first-run usage and troubleshooting, or the
 [upgrade instructions](#upgrade-from-an-older-release) for an existing tool.
 Use the filenames attached to your selected release if installing a different version.

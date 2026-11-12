@@ -8,6 +8,15 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
 
 No unreleased changes.
 
+## [0.6.1] - 2026-11-12
+
+### Changed
+
+- Add a unified release quick start covering verified downloads, fresh installs,
+  upgrades, first-run setup, provider references, controls and troubleshooting.
+- Clarify installed-tool versus source-checkout usage and schema-5 backup/downgrade
+  requirements. Runtime provider behavior and configuration schema are unchanged.
+
 ## [0.6.0] - 2026-11-12
 
 ### Added
