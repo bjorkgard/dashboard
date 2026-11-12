@@ -56,6 +56,9 @@ def test_settings_keyboard_flow_keeps_owned_application_running_until_explicit_q
                 os.write(master, b"4")
                 phase, offset = "github", len(output)
             elif phase == "github" and b"REPOSITORY ACTIVITY" in tail:
+                os.write(master, b"5")
+                phase, offset = "ai", len(output)
+            elif phase == "ai" and b"CLAUDE CODE USAGE" in tail:
                 os.write(master, b"s")
                 phase, offset = "settings", len(output)
             elif phase == "settings" and b"INTEGRATION SETTINGS" in tail:
@@ -64,7 +67,7 @@ def test_settings_keyboard_flow_keeps_owned_application_running_until_explicit_q
             elif (
                 phase == "overview"
                 and b"DAYBOARD" in tail
-                and (not demo or b"REPOSITORY ACTIVITY" in tail)
+                and (not demo or b"CLAUDE CODE USAGE" in tail)
             ):
                 returned_alive = process.poll() is None
                 os.write(master, b"q")  # Only this owned test PTY, never the user's dashboard.

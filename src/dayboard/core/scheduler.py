@@ -7,7 +7,12 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from dayboard.core.models import ErrorCode, ProviderKey, Snapshot
-from dayboard.core.providers import ProviderRegistry, ProviderUnavailable, RateLimited
+from dayboard.core.providers import (
+    ClosableProvider,
+    ProviderRegistry,
+    ProviderUnavailable,
+    RateLimited,
+)
 from dayboard.core.store import SnapshotStore
 
 
@@ -103,3 +108,6 @@ class Scheduler:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         self._tasks.clear()
+        for provider in self.registry.all():
+            if isinstance(provider, ClosableProvider):
+                provider.close()
