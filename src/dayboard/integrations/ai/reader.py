@@ -9,8 +9,10 @@ import os
 import stat
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from dayboard.core.ai_usage import UsageRecord
 from dayboard.core.models import ErrorCode
@@ -90,6 +92,87 @@ class _BudgetReached(Exception):
     pass
 
 
+class _DirectoryEntries(Protocol):
+    def __next__(self) -> os.DirEntry[str]: ...
+    def close(self) -> None: ...
+
+
+class _Discovery:
+    """One bounded discovery generation, owning at most one open directory iterator."""
+
+    def __init__(self, identity: tuple[int, int]) -> None:
+        self.identity = identity
+        self.queue: list[tuple[str, ...]] = [()]
+        self.current: tuple[str, ...] = ()
+        self.iterator: _DirectoryEntries | None = None
+        self.files: list[tuple[str, ...]] = []
+        self.entries = 0
+        self.complete = False
+
+    def close(self) -> None:
+        if self.iterator is not None:
+            self.iterator.close()
+            self.iterator = None
+
+    def __del__(self) -> None:
+        self.close()
+
+    def advance(
+        self,
+        root_fd: int,
+        reader: "ClaudeReader",
+        check: Callable[[], None],
+        issues: set[str],
+    ) -> None:
+        while self.queue or self.iterator is not None:
+            # Check before consuming work: never lose a popped directory or fetched entry.
+            check()
+            if self.iterator is None:
+                self.current = self.queue.pop()
+                fd = -1
+                try:
+                    fd = _open_relative(root_fd, self.current, directory=True)
+                    self.iterator = os.scandir(fd)
+                except OSError:
+                    issues.add("unreadable directory skipped")
+                    continue
+                finally:
+                    if fd >= 0:
+                        os.close(fd)
+            try:
+                entry = next(self.iterator)
+            except StopIteration:
+                self.close()
+                continue
+            except OSError:
+                issues.add("unreadable directory skipped")
+                self.close()
+                continue
+            self.entries += 1
+            if self.entries > reader.max_entries:
+                issues.add("discovery cap")
+                self.queue.clear()
+                self.close()
+                break
+            relative = (*self.current, entry.name)
+            try:
+                if entry.is_symlink():
+                    issues.add("unsafe entry skipped")
+                elif entry.is_dir(follow_symlinks=False):
+                    if len(relative) < reader.max_depth:
+                        self.queue.append(relative)
+                    else:
+                        issues.add("depth cap")
+                elif entry.name.endswith(".jsonl"):
+                    if len(self.files) < reader.max_files:
+                        self.files.append(relative)
+                    else:
+                        issues.add("file cap")
+            except OSError:
+                issues.add("unreadable entry skipped")
+        self.complete = True
+
+
 @dataclass(frozen=True)
 class Cursor:
     identity: tuple[int, int]
@@ -108,6 +191,11 @@ class ScanBatch:
     pending: bool
     discovered_at: float
     next_file: int
+    discovery: _Discovery | None = None
+
+    def close(self) -> None:
+        if self.discovery is not None:
+            self.discovery.close()
 
 
 class ClaudeReader:
@@ -140,10 +228,18 @@ class ClaudeReader:
         self.issues: frozenset[str] = frozenset()
         self.discovered_at = float("-inf")
         self.next_file = 0
+        self._discovery: _Discovery | None = None
+
+    def close(self) -> None:
+        if self._discovery is not None:
+            self._discovery.close()
+            self._discovery = None
 
     def commit(self, batch: ScanBatch) -> None:
+        self.close()
         self.files, self.cursors, self.issues = batch.files, batch.cursors, batch.issues
         self.discovered_at, self.next_file = batch.discovered_at, batch.next_file
+        self._discovery = batch.discovery
 
     def scan(self, stop: threading.Event) -> ScanBatch:
         deadline = time.monotonic() + self.seconds
@@ -170,52 +266,36 @@ class ClaudeReader:
         try:
             root_fd = _projects(self.root)
         except PermissionError:
+            self.close()
             raise ProviderUnavailable(ErrorCode.AI_PERMISSION_DENIED) from None
         except OSError:
+            self.close()
             raise ProviderUnavailable(ErrorCode.AI_SOURCE_UNAVAILABLE) from None
+        # Transfer unfinished work to this worker/batch; aborts close it instead of publishing it.
+        discovery, self._discovery = self._discovery, None
         try:
             files = list(self.files)
             discovered_at = self.discovered_at
             pending = False
-            if time.monotonic() - discovered_at >= 30:
-                files = []
-                queue: list[tuple[str, ...]] = [()]
-                entries = 0
+            root_info = os.fstat(root_fd)
+            identity = (root_info.st_dev, root_info.st_ino)
+            if discovery is not None and discovery.identity != identity:
+                discovery.close()
+                discovery = None
+                discovered_at = float("-inf")
+            if discovery is not None or time.monotonic() - discovered_at >= 30:
+                discovery = discovery or _Discovery(identity)
                 try:
-                    while queue:
-                        check()
-                        parts = queue.pop()
-                        fd = _open_relative(root_fd, parts, directory=True)
-                        try:
-                            with os.scandir(fd) as directory:
-                                for entry in directory:
-                                    check()
-                                    entries += 1
-                                    if entries > self.max_entries:
-                                        issues.add("discovery cap")
-                                        queue.clear()
-                                        break
-                                    relative = (*parts, entry.name)
-                                    if entry.is_symlink():
-                                        issues.add("unsafe entry skipped")
-                                    elif entry.is_dir(follow_symlinks=False):
-                                        if len(relative) < self.max_depth:
-                                            queue.append(relative)
-                                        else:
-                                            issues.add("depth cap")
-                                    elif entry.name.endswith(".jsonl"):
-                                        if len(files) < self.max_files:
-                                            files.append(relative)
-                                        else:
-                                            issues.add("file cap")
-                        finally:
-                            os.close(fd)
+                    discovery.advance(root_fd, self, check, issues)
                 except _BudgetReached:
                     pending = True
-                    issues.add("discovery budget")
-                except OSError:
-                    issues.add("unreadable directory skipped")
-                discovered_at = time.monotonic()
+                if discovery.complete:
+                    files = discovery.files
+                    discovered_at = time.monotonic()
+                    discovery = None
+                else:
+                    # Keep known files/cursors usable while the next generation is incomplete.
+                    files = list(dict.fromkeys((*files, *discovery.files)))[: self.max_files]
             file_set = set(files)
             cursors = {key: value for key, value in self.cursors.items() if key in file_set}
             next_file = self.next_file % max(1, len(files))
@@ -313,6 +393,11 @@ class ClaudeReader:
                 pending,
                 discovered_at,
                 next_file,
+                discovery,
             )
+        except BaseException:
+            if discovery is not None:
+                discovery.close()
+            raise
         finally:
             os.close(root_fd)

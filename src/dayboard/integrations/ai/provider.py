@@ -34,6 +34,17 @@ class ClaudeProvider:
 
     def _collect(self, stop: threading.Event) -> tuple[ScanBatch, UsageLedger, Snapshot]:
         batch = self.reader.scan(stop)
+        try:
+            return self._aggregate(batch, stop)
+        except BaseException:
+            batch.close()
+            raise
+
+    def _aggregate(
+        self,
+        batch: ScanBatch,
+        stop: threading.Event,
+    ) -> tuple[ScanBatch, UsageLedger, Snapshot]:
         now = datetime.now(UTC)
         ledger = UsageLedger(timezone=self.settings.timezone, limit=self.ledger.limit)
         ledger.records = self.ledger.records.copy()
@@ -163,8 +174,13 @@ class ClaudeProvider:
             stop.set()
             # Await the actual worker: cancelling to_thread alone does not stop filesystem work.
             with suppress(Exception):
-                await asyncio.shield(worker)
+                batch, _, _ = await asyncio.shield(worker)
+                batch.close()
+            self.reader.close()
             raise
         self.reader.commit(batch)
         self.ledger = ledger
         return snapshot
+
+    def close(self) -> None:
+        self.reader.close()

@@ -3,7 +3,7 @@
 import math
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from dayboard.core.models import ErrorCode, ProviderKey, Snapshot
 
@@ -57,6 +57,13 @@ class Provider(Protocol):
     def spec(self) -> ProviderSpec: ...
     async def collect(self) -> Snapshot:
         """Return bounded data; blocking I/O must be delegated off the event loop."""
+        ...
+
+
+@runtime_checkable
+class ClosableProvider(Protocol):
+    def close(self) -> None:
+        """Release idle resources after all collection tasks have stopped."""
         ...
 
 

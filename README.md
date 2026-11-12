@@ -182,6 +182,10 @@ deleted source history cannot be recovered. Collection targets five seconds; dir
 rediscovery targets 30 seconds. Initial limits are 5,000 files, eight directory levels,
 20,000 discovery entries, 8 MiB/two seconds of scan work per pass, 1 MiB per JSONL record,
 and 100,000 canonical requests over 30 calendar dates. Large backlogs index incrementally.
+Unfinished directory discovery resumes on the next pass, including within a directory;
+the rediscovery interval starts only after that traversal finishes. An inaccessible
+project does not block readable siblings. At most one directory iterator remains open
+between passes, and cancellation/disable/shutdown closes it.
 Caps, skipped/unsupported records and conflicts produce explicit partial/observed-so-far
 indicators, not claims of complete history. Diagnostics persist for the reader lifetime;
 Save/restart resets them while rebuilding history. Only a successfully scanned empty

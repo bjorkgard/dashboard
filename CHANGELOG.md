@@ -29,6 +29,13 @@ Release tags must match both `pyproject.toml` and `uv.lock`.
   and skipped/conflicting data are labelled partial. Restart/Settings Save rebuilds
   available history; deleted source history cannot be recovered. Other AI providers remain planned.
 
+### Fixed
+
+- Claude discovery now resumes queued directories and partially enumerated directories
+  across scan budgets, with caps applied to the entire discovery generation.
+- Inaccessible, unowned or removed project directories no longer prevent discovery
+  of readable siblings. Pending enumeration resources close on cancellation and shutdown.
+
 ## [0.4.0] - 2026-11-12
 
 ### Added
